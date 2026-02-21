@@ -777,7 +777,9 @@ export default function TeacherDashboard() {
                     </p>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button className="w-full bg-info hover:bg-info/90">{t.startTest}</Button>
+                       <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-black font-semibold shadow-md">
+  {t.startTest}
+</Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>

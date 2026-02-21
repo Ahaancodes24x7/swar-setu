@@ -27,6 +27,17 @@ export default function Login() {
         <section className="relative overflow-hidden min-h-screen flex items-center">
           <ImaginativeHeroBackground />
           <div className="container mx-auto px-4 relative z-10 py-24">
+            {/* Back Button */}
+            <div className="flex justify-start mb-8">
+              <button
+                onClick={() => navigate("/")}
+                className="flex items-center justify-center gap-2 h-10 w-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-foreground hover:bg-white/15 hover:border-white/30 transition-all duration-300 hover:shadow-lg hover:shadow-accent/20 group"
+                aria-label="Back to home"
+              >
+                <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" />
+              </button>
+            </div>
+
             <div className="max-w-3xl mx-auto text-center mb-12">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
                 Choose your portal to continue

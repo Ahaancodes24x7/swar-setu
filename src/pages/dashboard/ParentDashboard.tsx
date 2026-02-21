@@ -456,7 +456,9 @@ export default function ParentDashboard() {
           studentName={student?.name || "Student"} 
           studentId={student?.id}
           isOpen={chatOpen} 
-          onClose={() => setChatOpen(false)} 
+          onClose={() => setChatOpen(false)}
+          userRole="parent"
+          userGrade={student?.grade || "3"}
         />
 
         {/* Detailed Report Dialog */}

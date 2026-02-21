@@ -25,9 +25,11 @@ interface SaathiChatbotProps {
   studentId?: string;
   isOpen: boolean;
   onClose: () => void;
+  userRole?: "student" | "parent" | "teacher";
+  userGrade?: string;
 }
 
-export function SaathiChatbot({ studentName = "Friend", studentId, isOpen, onClose }: SaathiChatbotProps) {
+export function SaathiChatbot({ studentName = "Friend", studentId, isOpen, onClose, userRole = "student", userGrade = "3" }: SaathiChatbotProps) {
   const { language } = useLanguage();
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
@@ -232,6 +234,8 @@ export function SaathiChatbot({ studentName = "Friend", studentId, isOpen, onClo
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
           studentName,
           language: language.name,
+          userRole,
+          userGrade,
         }),
       });
 

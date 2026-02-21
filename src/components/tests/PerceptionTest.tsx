@@ -176,7 +176,21 @@ export function PerceptionTest({ studentName, studentGrade, studentId, onComplet
       toast.info("🎤 Recording... Speak now!");
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      toast.error("Could not access microphone. Please check permissions or use text input.");
+      
+      // Provide specific error messages based on error type
+      if (error instanceof DOMException) {
+        if (error.name === "NotAllowedError") {
+          toast.error("❌ Microphone access denied. Please enable microphone in browser settings and refresh.", { duration: 5000 });
+        } else if (error.name === "NotFoundError" || error.name === "NotSupported") {
+          toast.error("❌ No microphone found. Check that your microphone is connected.", { duration: 5000 });
+        } else if (error.name === "SecurityError") {
+          toast.error("❌ Microphone blocked. Try HTTPS or a different browser.", { duration: 5000 });
+        } else {
+          toast.error(`❌ Microphone error: ${error.message}`, { duration: 5000 });
+        }
+      } else {
+        toast.error("❌ Could not access microphone. Please check permissions.", { duration: 5000 });
+      }
     }
   };
 

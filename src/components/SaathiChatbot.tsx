@@ -113,7 +113,21 @@ export function SaathiChatbot({ studentName = "Friend", studentId, isOpen, onClo
       setIsRecording(true);
     } catch (err) {
       console.error("Error starting recording:", err);
-      setMicError("Microphone access denied. Please enable microphone access in your browser settings.");
+      
+      // Provide specific error messages based on error type
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") {
+          setMicError("❌ Microphone access denied. Enable microphone in browser settings and refresh the page.");
+        } else if (err.name === "NotFoundError" || err.name === "NotSupported") {
+          setMicError("❌ No microphone device found. Check that your microphone is connected.");
+        } else if (err.name === "SecurityError") {
+          setMicError("❌ Microphone access blocked. Try HTTPS or a different browser.");
+        } else {
+          setMicError(`❌ Microphone error: ${err.message}`);
+        }
+      } else {
+        setMicError("❌ Could not access microphone. Please check your browser permissions.");
+      }
     }
   }, []);
 

@@ -68,7 +68,21 @@ export function useVoicePractice(studentId?: string) {
       setIsRecording(true);
     } catch (err) {
       console.error("Error starting recording:", err);
-      setError("Microphone access denied. Please enable microphone access and try again.");
+      
+      // Provide specific error messages based on error type
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") {
+          setError("❌ Microphone access denied. Enable microphone in browser settings and refresh.");
+        } else if (err.name === "NotFoundError" || err.name === "NotSupported") {
+          setError("❌ No microphone device found. Check that your microphone is connected.");
+        } else if (err.name === "SecurityError") {
+          setError("❌ Microphone access blocked. Try HTTPS or a different browser.");
+        } else {
+          setError(`❌ Microphone error: ${err.message}`);
+        }
+      } else {
+        setError("❌ Could not access microphone. Please check your browser permissions.");
+      }
     }
   }, []);
 

@@ -197,7 +197,21 @@ export function TestQuestion({
     } catch (error) {
       console.error("Error accessing microphone:", error);
       setIsRecording(false);
-      toast.error("Could not access microphone. Please check permissions.");
+      
+      // Provide specific error messages based on error type
+      if (error instanceof DOMException) {
+        if (error.name === "NotAllowedError") {
+          toast.error("❌ Microphone access denied. Please enable microphone permissions in your browser settings and refresh the page.", { duration: 5000 });
+        } else if (error.name === "NotFoundError" || error.name === "NotSupported") {
+          toast.error("❌ No microphone device found. Please check that your microphone is connected.", { duration: 5000 });
+        } else if (error.name === "SecurityError") {
+          toast.error("❌ Microphone access blocked for security reasons. Try using HTTPS or a different browser.", { duration: 5000 });
+        } else {
+          toast.error(`❌ Microphone error: ${error.message}. Please check your browser permissions.`, { duration: 5000 });
+        }
+      } else {
+        toast.error("❌ Could not access microphone. Please check your browser permissions and try again.", { duration: 5000 });
+      }
     }
   };
 

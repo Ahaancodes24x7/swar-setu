@@ -41,6 +41,12 @@ export function useVoicePractice(studentId?: string) {
     try {
       setError(null);
       
+      // Check if microphone support exists
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError("❌ Microphone not supported. Please use Chrome, Firefox, Safari, or Edge.");
+        return;
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -72,16 +78,18 @@ export function useVoicePractice(studentId?: string) {
       // Provide specific error messages based on error type
       if (err instanceof DOMException) {
         if (err.name === "NotAllowedError") {
-          setError("❌ Microphone access denied. Enable microphone in browser settings and refresh.");
+          setError("❌ Microphone access denied. Enable microphone in browser settings and refresh the page.");
         } else if (err.name === "NotFoundError" || err.name === "NotSupported") {
           setError("❌ No microphone device found. Check that your microphone is connected.");
         } else if (err.name === "SecurityError") {
-          setError("❌ Microphone access blocked. Try HTTPS or a different browser.");
+          setError("❌ Microphone access blocked. Try HTTPS connection or use a different browser.");
+        } else if (err.name === "OverconstrainedError") {
+          setError("❌ Microphone doesn't meet requirements. Try a different browser or device.");
         } else {
-          setError(`❌ Microphone error: ${err.message}`);
+          setError(`❌ Microphone error: ${err.message}. Check browser permissions.`);
         }
       } else {
-        setError("❌ Could not access microphone. Please check your browser permissions.");
+        setError("❌ Cannot access microphone. Check browser permissions and device.");
       }
     }
   }, []);

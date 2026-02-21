@@ -256,26 +256,31 @@ export function TestQuestion({
       
       console.log("Sending audio blob:", audioBlob.size, "bytes");
       
-      const { data, error } = await supabase.functions.invoke("elevenlabs-transcribe", {
-        body: formData,
-      });
-      
-      if (!error && data?.text) {
-        console.log("Successfully transcribed via API:", data.text);
-        setTranscribedText(data.text);
-        toast.success("Voice captured successfully!");
-        return;
+      try {
+        const { data, error } = await supabase.functions.invoke("elevenlabs-transcribe", {
+          body: formData,
+        });
+        
+        if (!error && data?.text) {
+          console.log("Successfully transcribed via API:", data.text);
+          setTranscribedText(data.text);
+          toast.success("✅ Voice captured successfully!");
+          return;
+        }
+      } catch (apiError) {
+        console.warn("Transcription API unavailable, using fallback", apiError);
       }
 
-      // If API fails, use local fallback with Web Speech API approximation
-      console.warn("Transcription API failed, using local processing");
-      setTranscribedText("Voice recorded - ready to submit");
-      toast.warning("Audio recorded. Click submit to continue.");
+      // Fallback: Show user-friendly message
+      const fallbackText = `[Audio recorded - ${recordingSeconds} seconds]`;
+      setTranscribedText(fallbackText);
+      toast.info("⚠️ Audio recorded. API unavailable but ready to analyze!", { duration: 4000 });
       
     } catch (error) {
       console.error("Transcription exception:", error);
-      setTranscribedText("Voice recorded - ready to submit");
-      toast.warning("Audio recorded. Click submit to continue.");
+      const fallbackText = `[Audio recorded - ${recordingSeconds} seconds]`;
+      setTranscribedText(fallbackText);
+      toast.warning("⚠️ Audio recorded. Click submit to analyze.", { duration: 4000 });
     } finally {
       setIsProcessing(false);
     }

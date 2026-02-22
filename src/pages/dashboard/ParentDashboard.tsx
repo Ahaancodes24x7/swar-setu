@@ -128,6 +128,11 @@ export default function ParentDashboard() {
   // Get the most recent AI summary
   const latestSession = sessions[0];
   const latestReport = latestSession?.analysis_report as { summary?: string; recommendations?: string[] } | null;
+  
+  // Remove accuracy percentages from summary for parent view
+  const cleanSummary = latestReport?.summary
+    ? latestReport.summary.replace(/\(\d+%\s*accuracy\)/gi, "").replace(/\s+/g, " ").trim()
+    : null;
 
   if (authLoading || loading) {
     return (
@@ -234,18 +239,19 @@ export default function ParentDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {latestReport?.summary ? (
+                  {cleanSummary ? (
                     <>
                       <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                        {latestReport.summary}
+                        {cleanSummary}
                       </p>
                       {latestReport.recommendations && latestReport.recommendations.length > 0 && (
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-sm font-semibold mb-2">{t.recommendations}:</p>
                           <ul className="text-sm text-muted-foreground space-y-1">
-                            {latestReport.recommendations.slice(0, 3).map((rec, i) => (
-                              <li key={i}>• {rec}</li>
-                            ))}
+                            {latestReport.recommendations.slice(0, 3).map((rec, i) => {
+                              const cleanRec = rec.replace(/\(\d+%\s*accuracy\)/gi, "").replace(/\s+/g, " ").trim();
+                              return <li key={i}>• {cleanRec}</li>;
+                            })}
                           </ul>
                         </div>
                       )}

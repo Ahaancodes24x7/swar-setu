@@ -4,7 +4,6 @@ import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { SaathiChatbot } from "@/components/SaathiChatbot";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslations } from "@/hooks/useTranslations";
@@ -17,7 +16,6 @@ import {
   Flame,
   Target,
   BookOpen,
-  TrendingUp,
   Award,
   Zap,
   Calendar,
@@ -25,13 +23,12 @@ import {
   Sparkles,
   LogOut,
   Loader2,
-  AlertTriangle,
   Heart,
   Volume2,
   Calculator,
   Eye,
+  TrendingUp,
 } from "lucide-react";
-import { TestReportDialog } from "@/components/dashboard/TestReportDialog";
 
 type Student = Tables<"students">;
 type TestSession = Tables<"test_sessions">;
@@ -58,7 +55,6 @@ export default function ParentDashboard() {
   const [student, setStudent] = useState<Student | null>(null);
   const [sessions, setSessions] = useState<TestSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reportSession, setReportSession] = useState<TestSession | null>(null);
 
   // Use dynamic badges
   const { badges, loading: badgesLoading, checkAndAwardBadges } = useBadges(student?.id);
@@ -117,10 +113,6 @@ export default function ParentDashboard() {
 
   // Calculate stats from real data
   const totalTests = sessions.length;
-  const avgScore = sessions.length > 0 
-    ? Math.round(sessions.reduce((sum, s) => sum + (Number(s.overall_score) || 0), 0) / sessions.length)
-    : 0;
-  
   const readingAvg = sessions.length > 0
     ? Math.round(sessions.reduce((sum, s) => sum + (Number(s.reading_score) || 0), 0) / sessions.length)
     : 0;
@@ -134,6 +126,11 @@ export default function ParentDashboard() {
   // Get the most recent AI summary
   const latestSession = sessions[0];
   const latestReport = latestSession?.analysis_report as { summary?: string; recommendations?: string[] } | null;
+  
+  // Remove accuracy percentages from summary for parent view
+  const cleanSummary = latestReport?.summary
+    ? latestReport.summary.replace(/\(\d+%\s*accuracy\)/gi, "").replace(/\s+/g, " ").trim()
+    : null;
 
   if (authLoading || loading) {
     return (
@@ -187,19 +184,7 @@ export default function ParentDashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-primary/30">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Target className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{avgScore}%</p>
-                    <p className="text-xs text-muted-foreground">{t.avgScore}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
             <Card className="border-success/30">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
@@ -213,25 +198,7 @@ export default function ParentDashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-secondary/30">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-secondary/20 flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-secondary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {sessions.length > 1 ? 
-                        `${sessions[0]?.overall_score && sessions[1]?.overall_score ? 
-                          (Number(sessions[0].overall_score) > Number(sessions[1].overall_score) ? '+' : '') + 
-                          Math.round(Number(sessions[0].overall_score) - Number(sessions[1].overall_score)) : 0}%` 
-                        : '+0%'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t.thisWeek}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
@@ -247,25 +214,16 @@ export default function ParentDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{t.readingSkills}</span>
-                      <span className="text-sm text-muted-foreground">{readingAvg}%</span>
-                    </div>
-                    <Progress value={readingAvg} className="h-3" />
+                    <span className="text-sm font-medium">{t.readingSkills}</span>
+                    <Progress value={readingAvg} className="h-3 mt-2" />
                   </div>
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{t.numberRecognition}</span>
-                      <span className="text-sm text-muted-foreground">{numberAvg}%</span>
-                    </div>
-                    <Progress value={numberAvg} className="h-3" />
+                    <span className="text-sm font-medium">{t.numberRecognition}</span>
+                    <Progress value={numberAvg} className="h-3 mt-2" />
                   </div>
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{t.phonemeAccuracy}</span>
-                      <span className="text-sm text-muted-foreground">{phonemeAvg}%</span>
-                    </div>
-                    <Progress value={phonemeAvg} className="h-3" />
+                    <span className="text-sm font-medium">{t.phonemeAccuracy}</span>
+                    <Progress value={phonemeAvg} className="h-3 mt-2" />
                   </div>
                 </CardContent>
               </Card>
@@ -279,18 +237,19 @@ export default function ParentDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {latestReport?.summary ? (
+                  {cleanSummary ? (
                     <>
                       <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                        {latestReport.summary}
+                        {cleanSummary}
                       </p>
                       {latestReport.recommendations && latestReport.recommendations.length > 0 && (
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-sm font-semibold mb-2">{t.recommendations}:</p>
                           <ul className="text-sm text-muted-foreground space-y-1">
-                            {latestReport.recommendations.slice(0, 3).map((rec, i) => (
-                              <li key={i}>• {rec}</li>
-                            ))}
+                            {latestReport.recommendations.slice(0, 3).map((rec, i) => {
+                              const cleanRec = rec.replace(/\(\d+%\s*accuracy\)/gi, "").replace(/\s+/g, " ").trim();
+                              return <li key={i}>• {cleanRec}</li>;
+                            })}
                           </ul>
                         </div>
                       )}
@@ -300,9 +259,6 @@ export default function ParentDashboard() {
                       No tests completed yet. Complete a test to see the AI-generated learning report.
                     </p>
                   )}
-                  <Button variant="outline" size="sm" className="mt-4">
-                    {t.viewFullReport}
-                  </Button>
                 </CardContent>
               </Card>
 
@@ -322,21 +278,11 @@ export default function ParentDashboard() {
                   ) : (
                     <div className="space-y-3">
                       {sessions.slice(0, 5).map((session) => {
-                        const report = session.analysis_report as { riskLevel?: string } | null;
                         return (
-                          <div key={session.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors" onClick={() => setReportSession(session)}>
+                          <div key={session.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                             <div className="flex items-center gap-3">
-                              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                                report?.riskLevel === "low" ? "bg-success/20" :
-                                report?.riskLevel === "moderate" ? "bg-warning/20" : "bg-destructive/20"
-                              }`}>
-                                {report?.riskLevel === "low" ? (
-                                  <CheckCircle className="h-5 w-5 text-success" />
-                                ) : (
-                                  <AlertTriangle className={`h-5 w-5 ${
-                                    report?.riskLevel === "moderate" ? "text-warning" : "text-destructive"
-                                  }`} />
-                                )}
+                              <div className="h-10 w-10 rounded-full flex items-center justify-center bg-primary/20">
+                                <CheckCircle className="h-5 w-5 text-primary" />
                               </div>
                               <div>
                                 <p className="font-medium text-sm capitalize">{session.test_type} Test</p>
@@ -350,14 +296,7 @@ export default function ParentDashboard() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="font-bold text-lg">{session.overall_score ?? 0}%</p>
-                              <Badge variant={
-                                report?.riskLevel === "low" ? "default" :
-                                report?.riskLevel === "moderate" ? "secondary" : "destructive"
-                              } className="text-xs">
-                                {report?.riskLevel === "low" ? t.lowRisk :
-                                 report?.riskLevel === "moderate" ? t.moderateRisk : t.highRisk}
-                              </Badge>
+                              <p className="text-sm text-muted-foreground">Completed</p>
                             </div>
                           </div>
                         );
@@ -460,18 +399,6 @@ export default function ParentDashboard() {
           userRole="parent"
           userGrade={student?.grade || "3"}
         />
-
-        {/* Detailed Report Dialog */}
-        {reportSession && (
-          <TestReportDialog
-            session={{
-              ...reportSession,
-              student: student ? { name: student.name, grade: student.grade } : undefined,
-            }}
-            open={!!reportSession}
-            onOpenChange={(open) => { if (!open) setReportSession(null); }}
-          />
-        )}
       </div>
     </Layout>
   );

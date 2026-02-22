@@ -300,7 +300,13 @@ export default function ParentDashboard() {
                       No tests completed yet. Complete a test to see the AI-generated learning report.
                     </p>
                   )}
-                  <Button variant="outline" size="sm" className="mt-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4"
+                    onClick={() => latestSession && setReportSession(latestSession)}
+                    disabled={!latestSession}
+                  >
                     {t.viewFullReport}
                   </Button>
                 </CardContent>

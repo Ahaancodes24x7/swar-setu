@@ -4,7 +4,6 @@ import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { SaathiChatbot } from "@/components/SaathiChatbot";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslations } from "@/hooks/useTranslations";
@@ -24,7 +23,6 @@ import {
   Sparkles,
   LogOut,
   Loader2,
-  AlertTriangle,
   Heart,
   Volume2,
   Calculator,
@@ -284,21 +282,11 @@ export default function ParentDashboard() {
                   ) : (
                     <div className="space-y-3">
                       {sessions.slice(0, 5).map((session) => {
-                        const report = session.analysis_report as { riskLevel?: string } | null;
                         return (
                           <div key={session.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors" onClick={() => setReportSession(session)}>
                             <div className="flex items-center gap-3">
-                              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                                report?.riskLevel === "low" ? "bg-success/20" :
-                                report?.riskLevel === "moderate" ? "bg-warning/20" : "bg-destructive/20"
-                              }`}>
-                                {report?.riskLevel === "low" ? (
-                                  <CheckCircle className="h-5 w-5 text-success" />
-                                ) : (
-                                  <AlertTriangle className={`h-5 w-5 ${
-                                    report?.riskLevel === "moderate" ? "text-warning" : "text-destructive"
-                                  }`} />
-                                )}
+                              <div className="h-10 w-10 rounded-full flex items-center justify-center bg-primary/20">
+                                <CheckCircle className="h-5 w-5 text-primary" />
                               </div>
                               <div>
                                 <p className="font-medium text-sm capitalize">{session.test_type} Test</p>
@@ -312,14 +300,7 @@ export default function ParentDashboard() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="font-bold text-lg">{session.overall_score ?? 0}%</p>
-                              <Badge variant={
-                                report?.riskLevel === "low" ? "default" :
-                                report?.riskLevel === "moderate" ? "secondary" : "destructive"
-                              } className="text-xs">
-                                {report?.riskLevel === "low" ? t.lowRisk :
-                                 report?.riskLevel === "moderate" ? t.moderateRisk : t.highRisk}
-                              </Badge>
+                              <p className="text-sm text-muted-foreground">Completed</p>
                             </div>
                           </div>
                         );

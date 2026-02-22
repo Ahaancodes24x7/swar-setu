@@ -29,7 +29,6 @@ import {
   Eye,
   TrendingUp,
 } from "lucide-react";
-import { TestReportDialog } from "@/components/dashboard/TestReportDialog";
 
 type Student = Tables<"students">;
 type TestSession = Tables<"test_sessions">;
@@ -56,7 +55,6 @@ export default function ParentDashboard() {
   const [student, setStudent] = useState<Student | null>(null);
   const [sessions, setSessions] = useState<TestSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reportSession, setReportSession] = useState<TestSession | null>(null);
 
   // Use dynamic badges
   const { badges, loading: badgesLoading, checkAndAwardBadges } = useBadges(student?.id);
@@ -261,15 +259,6 @@ export default function ParentDashboard() {
                       No tests completed yet. Complete a test to see the AI-generated learning report.
                     </p>
                   )}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-4"
-                    onClick={() => latestSession && setReportSession(latestSession)}
-                    disabled={!latestSession}
-                  >
-                    {t.viewFullReport}
-                  </Button>
                 </CardContent>
               </Card>
 
@@ -290,7 +279,7 @@ export default function ParentDashboard() {
                     <div className="space-y-3">
                       {sessions.slice(0, 5).map((session) => {
                         return (
-                          <div key={session.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors" onClick={() => setReportSession(session)}>
+                          <div key={session.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-full flex items-center justify-center bg-primary/20">
                                 <CheckCircle className="h-5 w-5 text-primary" />
@@ -410,19 +399,6 @@ export default function ParentDashboard() {
           userRole="parent"
           userGrade={student?.grade || "3"}
         />
-
-        {/* Detailed Report Dialog */}
-        {reportSession && (
-          <TestReportDialog
-            session={{
-              ...reportSession,
-              student: student ? { name: student.name, grade: student.grade } : undefined,
-            }}
-            open={!!reportSession}
-            onOpenChange={(open) => { if (!open) setReportSession(null); }}
-            simplified={true}
-          />
-        )}
       </div>
     </Layout>
   );

@@ -28,7 +28,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { 
   Users, Plus, Trash2, Mic, FileText, AlertTriangle, CheckCircle, Mail, 
   Search, Download, Loader2, LogOut, BookOpen, Calculator, Pencil, 
-  ArrowLeft, TrendingUp, X, Eye, Brain, ArrowUpDown, Check
+  ArrowLeft, TrendingUp, X, Eye, Brain, ArrowUpDown, Check, HelpCircle
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -325,6 +325,14 @@ export default function TeacherDashboard() {
               <p className="text-muted-foreground">{t.conductTests}</p>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="rounded-full border-primary/30 text-primary hover:bg-primary/10 hover:text-primary hover:shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+                onClick={() => navigate("/dashboard/teacher/help")}
+              >
+                <HelpCircle className="h-4 w-4 mr-2" />
+                Need Help?
+              </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="hero"><Plus className="h-4 w-4 mr-2" />Plant a Tree</Button>

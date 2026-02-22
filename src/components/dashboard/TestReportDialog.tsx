@@ -28,6 +28,7 @@ interface TestReportDialogProps {
   session: TestSession & { student?: { name: string; grade: string } };
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  simplified?: boolean; // If true, show summary, recommendations, and risk only. If false, show all details.
 }
 
 interface AnalysisReport {
@@ -74,7 +75,7 @@ function RiskBadge({ level }: { level: string }) {
   );
 }
 
-export function TestReportDialog({ session, open, onOpenChange }: TestReportDialogProps) {
+export function TestReportDialog({ session, open, onOpenChange, simplified = false }: TestReportDialogProps) {
   const report = session.analysis_report as AnalysisReport | null;
   const testInfo = testTypeLabels[session.test_type] || { label: session.test_type, icon: <Target className="h-5 w-5" /> };
 
@@ -98,17 +99,21 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </picture>
               <img src={logoDark} alt="SWARSETU" className="h-8 hidden dark:block" />
             </div>
-            <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-              <Download className="h-4 w-4 mr-2" />
-              Export PDF
-            </Button>
+            {!simplified && (
+              <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+                <Download className="h-4 w-4 mr-2" />
+                Export PDF
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
               {testInfo.icon}
             </div>
             <div>
-              <DialogTitle className="text-lg">{testInfo.label} Report</DialogTitle>
+              <DialogTitle className="text-lg">
+                {simplified ? `${session.student?.name || "Your Child"}'s Learning Assessment` : `${testInfo.label} Report`}
+              </DialogTitle>
               <DialogDescription>
                 {session.student?.name || "Student"} • Grade {session.student?.grade || "?"} •{" "}
                 {new Date(session.created_at).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}
@@ -119,35 +124,39 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
 
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-6">
-            {/* Score & Risk */}
-            <div className="rounded-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-5xl font-bold text-primary">{session.overall_score ?? "N/A"}%</p>
-                    <p className="text-sm text-muted-foreground mt-1">Overall Score</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {report?.riskLevel && <RiskBadge level={report.riskLevel} />}
-                    <Badge variant="outline" className="capitalize">{session.test_type} test</Badge>
+            {/* Score & Risk - Hidden in simplified parent view */}
+            {!simplified && (
+              <div className="rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-5xl font-bold text-primary">{session.overall_score ?? "N/A"}%</p>
+                      <p className="text-sm text-muted-foreground mt-1">Overall Score</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {report?.riskLevel && <RiskBadge level={report.riskLevel} />}
+                      <Badge variant="outline" className="capitalize">{session.test_type} test</Badge>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Summary */}
             {report?.summary && (
-              <div className="p-4 rounded-lg border bg-card">
-                <h3 className="font-semibold mb-2 flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-primary" />
-                  AI Analysis Summary
+              <div className={`p-4 rounded-lg border ${simplified ? 'bg-primary/5 border-primary/20' : 'bg-card'}`}>
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  {simplified ? '💬 ' : <Brain className="h-4 w-4 text-primary" />}
+                  {simplified ? 'What We Found' : 'AI Analysis Summary'}
                 </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{report.summary}</p>
+                <p className={`${simplified ? 'text-base leading-relaxed text-foreground' : 'text-sm text-muted-foreground leading-relaxed'}`}>
+                  {report.summary}
+                </p>
               </div>
             )}
 
-            {/* Flagged Conditions */}
-            {report?.flaggedConditions && report.flaggedConditions.length > 0 && (
+            {/* Flagged Conditions - Detailed view only */}
+            {!simplified && report?.flaggedConditions && report.flaggedConditions.length > 0 && (
               <div className="p-4 rounded-lg border border-destructive/30 bg-destructive/5">
                 <h3 className="font-semibold mb-2 text-destructive">⚠ Flagged Conditions</h3>
                 <div className="flex flex-wrap gap-2">
@@ -160,8 +169,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </div>
             )}
 
-            {/* Domain Scores (Dysgraphia) */}
-            {report?.domainScores && (
+            {/* Domain Scores (Dysgraphia) - Detailed view only */}
+            {!simplified && report?.domainScores && (
               <>
                 <Separator />
                 <div>
@@ -184,8 +193,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Subtest Scores (Dyslexia/Dyscalculia) */}
-            {report?.subtestScores && report.subtestScores.length > 0 && (
+            {/* Subtest Scores (Dyslexia/Dyscalculia) - Detailed view only */}
+            {!simplified && report?.subtestScores && report.subtestScores.length > 0 && (
               <>
                 <Separator />
                 <div>
@@ -220,8 +229,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Perception Analysis */}
-            {report?.analysis && (
+            {/* Perception Analysis - Detailed view only */}
+            {!simplified && report?.analysis && (
               <>
                 <Separator />
                 <div>
@@ -270,8 +279,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Answered Questions (Dyslexia/Dyscalculia) */}
-            {report?.answeredQuestions && report.answeredQuestions.length > 0 && (
+            {/* Answered Questions (Dyslexia/Dyscalculia) - Detailed view only */}
+            {!simplified && report?.answeredQuestions && report.answeredQuestions.length > 0 && (
               <>
                 <Separator />
                 <div>
@@ -316,15 +325,16 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
             {/* Recommendations */}
             {report?.recommendations && report.recommendations.length > 0 && (
               <>
-                <Separator />
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                {!simplified && <Separator />}
+                <div className={simplified ? 'p-4 rounded-lg border border-success/20 bg-success/5' : 'p-4 rounded-lg bg-primary/5 border border-primary/20'}>
                   <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    💡 Recommendations
+                    {simplified ? '✨ ' : '💡 '} 
+                    {simplified ? 'Ways to Support Your Child' : 'Recommendations'}
                   </h3>
                   <ul className="space-y-2">
                     {report.recommendations.map((rec, i) => (
                       <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <CheckCircle className={`h-4 w-4 ${simplified ? 'text-success' : 'text-primary'} mt-0.5 flex-shrink-0`} />
                         {rec}
                       </li>
                     ))}
@@ -333,8 +343,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Raw Metrics (Dysgraphia) */}
-            {report?.metrics && Object.keys(report.metrics).length > 0 && (
+            {/* Raw Metrics (Dysgraphia) - Detailed view only */}
+            {!simplified && report?.metrics && Object.keys(report.metrics).length > 0 && (
               <>
                 <Separator />
                 <div>
@@ -351,11 +361,13 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Disclaimer Footer */}
-            <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs text-muted-foreground">
-              <strong>Disclaimer:</strong> This is a screening tool only and does not constitute a medical diagnosis.
-              Consult qualified SLD specialists for proper diagnosis.
-            </div>
+            {/* Disclaimer Footer - Detailed view only */}
+            {!simplified && (
+              <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs text-muted-foreground">
+                <strong>Disclaimer:</strong> This is a screening tool only and does not constitute a medical diagnosis.
+                Consult qualified SLD specialists for proper diagnosis.
+              </div>
+            )}
           </div>
         </ScrollArea>
       </DialogContent>

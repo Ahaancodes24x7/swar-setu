@@ -27,6 +27,7 @@ import {
   Volume2,
   Calculator,
   Eye,
+  TrendingUp,
 } from "lucide-react";
 import { TestReportDialog } from "@/components/dashboard/TestReportDialog";
 

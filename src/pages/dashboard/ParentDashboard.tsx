@@ -17,7 +17,6 @@ import {
   Flame,
   Target,
   BookOpen,
-  TrendingUp,
   Award,
   Zap,
   Calendar,
@@ -117,10 +116,6 @@ export default function ParentDashboard() {
 
   // Calculate stats from real data
   const totalTests = sessions.length;
-  const avgScore = sessions.length > 0 
-    ? Math.round(sessions.reduce((sum, s) => sum + (Number(s.overall_score) || 0), 0) / sessions.length)
-    : 0;
-  
   const readingAvg = sessions.length > 0
     ? Math.round(sessions.reduce((sum, s) => sum + (Number(s.reading_score) || 0), 0) / sessions.length)
     : 0;
@@ -187,19 +182,7 @@ export default function ParentDashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-primary/30">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Target className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{avgScore}%</p>
-                    <p className="text-xs text-muted-foreground">{t.avgScore}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
             <Card className="border-success/30">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
@@ -213,25 +196,7 @@ export default function ParentDashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-secondary/30">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-secondary/20 flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-secondary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {sessions.length > 1 ? 
-                        `${sessions[0]?.overall_score && sessions[1]?.overall_score ? 
-                          (Number(sessions[0].overall_score) > Number(sessions[1].overall_score) ? '+' : '') + 
-                          Math.round(Number(sessions[0].overall_score) - Number(sessions[1].overall_score)) : 0}%` 
-                        : '+0%'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t.thisWeek}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
@@ -247,25 +212,16 @@ export default function ParentDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{t.readingSkills}</span>
-                      <span className="text-sm text-muted-foreground">{readingAvg}%</span>
-                    </div>
-                    <Progress value={readingAvg} className="h-3" />
+                    <span className="text-sm font-medium">{t.readingSkills}</span>
+                    <Progress value={readingAvg} className="h-3 mt-2" />
                   </div>
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{t.numberRecognition}</span>
-                      <span className="text-sm text-muted-foreground">{numberAvg}%</span>
-                    </div>
-                    <Progress value={numberAvg} className="h-3" />
+                    <span className="text-sm font-medium">{t.numberRecognition}</span>
+                    <Progress value={numberAvg} className="h-3 mt-2" />
                   </div>
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{t.phonemeAccuracy}</span>
-                      <span className="text-sm text-muted-foreground">{phonemeAvg}%</span>
-                    </div>
-                    <Progress value={phonemeAvg} className="h-3" />
+                    <span className="text-sm font-medium">{t.phonemeAccuracy}</span>
+                    <Progress value={phonemeAvg} className="h-3 mt-2" />
                   </div>
                 </CardContent>
               </Card>

@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { TestReportDialog } from "@/components/dashboard/TestReportDialog";
+import { StudentProgressModal } from "@/components/dashboard/StudentProgressModal";
 
 type TestSession = Tables<"test_sessions">;
 type Student = Tables<"students">;
@@ -64,6 +65,7 @@ export default function TeacherDashboard() {
   const [viewMode, setViewMode] = useState<ViewMode>("forest");
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<Student | null>(null);
   const [reportSession, setReportSession] = useState<SessionWithStudent | null>(null);
+  const [progressModalStudent, setProgressModalStudent] = useState<Student | null>(null);
   
   // Test selection state
   const [selectedTest, setSelectedTest] = useState<TestType>(null);
@@ -469,6 +471,10 @@ export default function TeacherDashboard() {
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <Button variant="outline" onClick={() => setProgressModalStudent(selectedStudentForDetail)}>
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            {t.studentProgress}
+                          </Button>
                           <Button variant="outline" onClick={() => startTest("dyslexia", selectedStudentForDetail)}>
                             <BookOpen className="h-4 w-4 mr-2" />
                             Reading Test
@@ -545,6 +551,7 @@ export default function TeacherDashboard() {
                             <TableHead>{t.grade}</TableHead>
                             <TableHead>{t.status}</TableHead>
                             <TableHead>Parent</TableHead>
+                            <TableHead className="text-center">{t.studentProgress}</TableHead>
                             <TableHead className="text-right">{t.actions}</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -570,6 +577,16 @@ export default function TeacherDashboard() {
                                 ) : (
                                   <span className="text-muted-foreground text-xs">Not linked</span>
                                 )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setProgressModalStudent(student)}
+                                >
+                                  <TrendingUp className="h-4 w-4 mr-1" />
+                                  {t.studentProgress}
+                                </Button>
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
@@ -896,6 +913,18 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
           </Tabs>
+
+          {/* Student Progress Modal */}
+          {progressModalStudent && user && (
+            <StudentProgressModal
+              isOpen={!!progressModalStudent}
+              onClose={() => setProgressModalStudent(null)}
+              studentId={progressModalStudent.id}
+              studentName={progressModalStudent.name}
+              studentGrade={progressModalStudent.grade}
+              teacherId={user.id}
+            />
+          )}
 
           {/* Report Dialog */}
           {reportSession && (

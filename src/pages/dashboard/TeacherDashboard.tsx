@@ -460,9 +460,15 @@ export default function TeacherDashboard() {
                           <CardTitle className="flex items-center gap-2">
                             🌳 {selectedStudentForDetail.name}
                           </CardTitle>
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedStudentForDetail(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setProgressModalStudent(selectedStudentForDetail)}>
+                              <TrendingUp className="h-4 w-4 mr-1" />
+                              {t.studentProgress}
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedStudentForDetail(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         <CardDescription>
                           Grade {selectedStudentForDetail.grade} • 
@@ -471,10 +477,6 @@ export default function TeacherDashboard() {
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <Button variant="outline" onClick={() => setProgressModalStudent(selectedStudentForDetail)}>
-                            <TrendingUp className="h-4 w-4 mr-2" />
-                            {t.studentProgress}
-                          </Button>
                           <Button variant="outline" onClick={() => startTest("dyslexia", selectedStudentForDetail)}>
                             <BookOpen className="h-4 w-4 mr-2" />
                             Reading Test
@@ -544,18 +546,19 @@ export default function TeacherDashboard() {
                         <p className="text-muted-foreground">{t.noStudentsFound}</p>
                       </div>
                     ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>{t.studentName}</TableHead>
-                            <TableHead>{t.grade}</TableHead>
-                            <TableHead>{t.status}</TableHead>
-                            <TableHead>Parent</TableHead>
-                            <TableHead className="text-center">{t.studentProgress}</TableHead>
-                            <TableHead className="text-right">{t.actions}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                      <div className="overflow-x-auto -mx-1">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>{t.studentName}</TableHead>
+                              <TableHead>{t.grade}</TableHead>
+                              <TableHead>{t.status}</TableHead>
+                              <TableHead>Parent</TableHead>
+                              <TableHead className="text-center min-w-[140px]">{t.studentProgress}</TableHead>
+                              <TableHead className="text-right">{t.actions}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
                           {sortedStudents.map((student) => (
                             <TableRow key={student.id}>
                               <TableCell className="font-medium">{student.name}</TableCell>
@@ -578,14 +581,14 @@ export default function TeacherDashboard() {
                                   <span className="text-muted-foreground text-xs">Not linked</span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-center">
+                              <TableCell className="text-center min-w-[140px]">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => setProgressModalStudent(student)}
                                 >
-                                  <TrendingUp className="h-4 w-4 mr-1" />
-                                  {t.studentProgress}
+                                  <TrendingUp className="h-4 w-4 mr-1 shrink-0" />
+                                  <span className="whitespace-nowrap">{t.studentProgress}</span>
                                 </Button>
                               </TableCell>
                               <TableCell className="text-right">
@@ -672,7 +675,8 @@ export default function TeacherDashboard() {
                             </TableRow>
                           ))}
                         </TableBody>
-                      </Table>
+                        </Table>
+                      </div>
                     )}
                   </CardContent>
                 </Card>

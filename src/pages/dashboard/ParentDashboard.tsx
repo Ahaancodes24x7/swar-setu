@@ -476,6 +476,7 @@ export default function ParentDashboard() {
             }}
             open={!!reportSession}
             onOpenChange={(open) => { if (!open) setReportSession(null); }}
+            simplified={true}
           />
         )}
       </div>

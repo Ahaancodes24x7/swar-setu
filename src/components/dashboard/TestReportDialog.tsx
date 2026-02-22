@@ -28,6 +28,7 @@ interface TestReportDialogProps {
   session: TestSession & { student?: { name: string; grade: string } };
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  simplified?: boolean; // If true, show summary, recommendations, and risk only. If false, show all details.
 }
 
 interface AnalysisReport {
@@ -74,7 +75,7 @@ function RiskBadge({ level }: { level: string }) {
   );
 }
 
-export function TestReportDialog({ session, open, onOpenChange }: TestReportDialogProps) {
+export function TestReportDialog({ session, open, onOpenChange, simplified = false }: TestReportDialogProps) {
   const report = session.analysis_report as AnalysisReport | null;
   const testInfo = testTypeLabels[session.test_type] || { label: session.test_type, icon: <Target className="h-5 w-5" /> };
 
@@ -146,8 +147,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </div>
             )}
 
-            {/* Flagged Conditions */}
-            {report?.flaggedConditions && report.flaggedConditions.length > 0 && (
+            {/* Flagged Conditions - Detailed view only */}
+            {!simplified && report?.flaggedConditions && report.flaggedConditions.length > 0 && (
               <div className="p-4 rounded-lg border border-destructive/30 bg-destructive/5">
                 <h3 className="font-semibold mb-2 text-destructive">⚠ Flagged Conditions</h3>
                 <div className="flex flex-wrap gap-2">
@@ -160,8 +161,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </div>
             )}
 
-            {/* Domain Scores (Dysgraphia) */}
-            {report?.domainScores && (
+            {/* Domain Scores (Dysgraphia) - Detailed view only */}
+            {!simplified && report?.domainScores && (
               <>
                 <Separator />
                 <div>
@@ -184,8 +185,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Subtest Scores (Dyslexia/Dyscalculia) */}
-            {report?.subtestScores && report.subtestScores.length > 0 && (
+            {/* Subtest Scores (Dyslexia/Dyscalculia) - Detailed view only */}
+            {!simplified && report?.subtestScores && report.subtestScores.length > 0 && (
               <>
                 <Separator />
                 <div>
@@ -220,8 +221,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Perception Analysis */}
-            {report?.analysis && (
+            {/* Perception Analysis - Detailed view only */}
+            {!simplified && report?.analysis && (
               <>
                 <Separator />
                 <div>
@@ -270,8 +271,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Answered Questions (Dyslexia/Dyscalculia) */}
-            {report?.answeredQuestions && report.answeredQuestions.length > 0 && (
+            {/* Answered Questions (Dyslexia/Dyscalculia) - Detailed view only */}
+            {!simplified && report?.answeredQuestions && report.answeredQuestions.length > 0 && (
               <>
                 <Separator />
                 <div>
@@ -333,8 +334,8 @@ export function TestReportDialog({ session, open, onOpenChange }: TestReportDial
               </>
             )}
 
-            {/* Raw Metrics (Dysgraphia) */}
-            {report?.metrics && Object.keys(report.metrics).length > 0 && (
+            {/* Raw Metrics (Dysgraphia) - Detailed view only */}
+            {!simplified && report?.metrics && Object.keys(report.metrics).length > 0 && (
               <>
                 <Separator />
                 <div>

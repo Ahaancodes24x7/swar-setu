@@ -12,12 +12,11 @@ serve(async (req) => {
 
   try {
     const { messages, studentName, language, userRole = "student", userGrade = "3" } = await req.json();
-    const MEGA_LLM_API_KEY = Deno.env.get("MEGA_LLM_API_KEY");
-    const MEGA_LLM_API_URL = Deno.env.get("MEGA_LLM_API_URL") || "https://ai.megallm.io/v1/chat/completions";
-    const MEGA_LLM_MODEL = Deno.env.get("MEGA_LLM_MODEL") || "gpt-4o";
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-1.5-pro";
     
-    if (!MEGA_LLM_API_KEY) {
-      throw new Error("MEGA_LLM_API_KEY is not configured");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
 
 const systemPrompt = `You are "Saathi" (साथी), a friendly, encouraging, and patient AI learning companion. Your name means "companion" or "friend" in Hindi.
@@ -74,23 +73,49 @@ REASSURANCE FOR PARENTS:
 
 Important: Be warm, supportive, and make learning feel like play for students. Be empathetic and encouraging for parents!`;
 
-    const response = await fetch(MEGA_LLM_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${MEGA_LLM_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MEGA_LLM_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: true,
-        max_tokens: 1000,
-        temperature: 0.8,
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `${systemPrompt}\n\n---\n\nConversation:\n${messages.map(m => `${m.role === "user" ? "Student/Parent" : "Saathi"}: ${m.content}`).join('\n')}`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0.8,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_NONE",
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_NONE",
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_NONE",
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_NONE",
+            },
+          ],
+        }),
+      }
+    );
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -99,21 +124,68 @@ Important: Be warm, supportive, and make learning feel like play for students. B
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 402 || response.status === 403) {
         return new Response(
           JSON.stringify({ error: "Saathi needs a break. Please try again later!" }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
+      console.error("Gemini API error:", response.status, text);
       return new Response(
         JSON.stringify({ error: "Saathi is having trouble thinking. Please try again!" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(response.body, {
+    // Transform Gemini's stream format to SSE format
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    const transformedStream = new ReadableStream({
+      async start(controller) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+
+              try {
+                const json = JSON.parse(line);
+                const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  const sseData = JSON.stringify({
+                    choices: [{ delta: { content: text } }]
+                  });
+                  controller.enqueue(`data: ${sseData}\n\n`);
+                }
+              } catch (e) {
+                console.error("Error parsing Gemini response:", e);
+              }
+            }
+          }
+
+          // Send completion marker
+          controller.enqueue("data: [DONE]\n\n");
+          controller.close();
+        } catch (e) {
+          controller.error(e);
+        }
+      }
+    });
+
+    return new Response(transformedStream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

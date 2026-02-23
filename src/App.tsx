@@ -15,6 +15,7 @@ import ParentDashboard from "./pages/dashboard/ParentDashboard";
 import TeacherDashboard from "./pages/dashboard/TeacherDashboard";
 import PrincipalDashboard from "./pages/dashboard/PrincipalDashboard";
 import TeacherLearningResources from "./pages/dashboard/TeacherLearningResources";
+import TeacherHelp from "./pages/dashboard/teacher/TeacherHelp";
 import VoiceTestPage from "./pages/VoiceTestPage";
 import LearningResources from "./pages/LearningResources";
 import NotFound from "./pages/NotFound";
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/dashboard/parent" element={<ProtectedRoute><ParentDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/teacher" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
               <Route path="/dashboard/teacher/resources" element={<ProtectedRoute><TeacherLearningResources /></ProtectedRoute>} />
+              <Route path="/dashboard/teacher/help" element={<ProtectedRoute><TeacherHelp /></ProtectedRoute>} />
               <Route path="/dashboard/principal" element={<ProtectedRoute><PrincipalDashboard /></ProtectedRoute>} />
               <Route path="/voice-test" element={<ProtectedRoute><VoiceTestPage /></ProtectedRoute>} />
               <Route path="/learning-resources" element={<ProtectedRoute><LearningResources /></ProtectedRoute>} />

@@ -28,7 +28,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { 
   Users, Plus, Trash2, Mic, FileText, AlertTriangle, CheckCircle, Mail, 
   Search, Download, Loader2, LogOut, BookOpen, Calculator, Pencil, 
-  ArrowLeft, TrendingUp, X, Eye, Brain, ArrowUpDown, Check
+  ArrowLeft, TrendingUp, X, Eye, Brain, ArrowUpDown, Check, HelpCircle
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { TestReportDialog } from "@/components/dashboard/TestReportDialog";
+import { StudentProgressModal } from "@/components/dashboard/StudentProgressModal";
 
 type TestSession = Tables<"test_sessions">;
 type Student = Tables<"students">;
@@ -64,6 +65,7 @@ export default function TeacherDashboard() {
   const [viewMode, setViewMode] = useState<ViewMode>("forest");
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<Student | null>(null);
   const [reportSession, setReportSession] = useState<SessionWithStudent | null>(null);
+  const [progressModalStudent, setProgressModalStudent] = useState<Student | null>(null);
   
   // Test selection state
   const [selectedTest, setSelectedTest] = useState<TestType>(null);
@@ -323,6 +325,14 @@ export default function TeacherDashboard() {
               <p className="text-muted-foreground">{t.conductTests}</p>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="rounded-full border-primary/30 text-primary hover:bg-primary/10 hover:text-primary hover:shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+                onClick={() => navigate("/dashboard/teacher/help")}
+              >
+                <HelpCircle className="h-4 w-4 mr-2" />
+                Need Help?
+              </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="hero"><Plus className="h-4 w-4 mr-2" />Plant a Tree</Button>
@@ -458,9 +468,15 @@ export default function TeacherDashboard() {
                           <CardTitle className="flex items-center gap-2">
                             🌳 {selectedStudentForDetail.name}
                           </CardTitle>
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedStudentForDetail(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setProgressModalStudent(selectedStudentForDetail)}>
+                              <TrendingUp className="h-4 w-4 mr-1" />
+                              {t.studentProgress}
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedStudentForDetail(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         <CardDescription>
                           Grade {selectedStudentForDetail.grade} • 
@@ -538,17 +554,19 @@ export default function TeacherDashboard() {
                         <p className="text-muted-foreground">{t.noStudentsFound}</p>
                       </div>
                     ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>{t.studentName}</TableHead>
-                            <TableHead>{t.grade}</TableHead>
-                            <TableHead>{t.status}</TableHead>
-                            <TableHead>Parent</TableHead>
-                            <TableHead className="text-right">{t.actions}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                      <div className="overflow-x-auto -mx-1">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>{t.studentName}</TableHead>
+                              <TableHead>{t.grade}</TableHead>
+                              <TableHead>{t.status}</TableHead>
+                              <TableHead>Parent</TableHead>
+                              <TableHead className="text-center min-w-[140px]">{t.studentProgress}</TableHead>
+                              <TableHead className="text-right">{t.actions}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
                           {sortedStudents.map((student) => (
                             <TableRow key={student.id}>
                               <TableCell className="font-medium">{student.name}</TableCell>
@@ -570,6 +588,16 @@ export default function TeacherDashboard() {
                                 ) : (
                                   <span className="text-muted-foreground text-xs">Not linked</span>
                                 )}
+                              </TableCell>
+                              <TableCell className="text-center min-w-[140px]">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setProgressModalStudent(student)}
+                                >
+                                  <TrendingUp className="h-4 w-4 mr-1 shrink-0" />
+                                  <span className="whitespace-nowrap">{t.studentProgress}</span>
+                                </Button>
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
@@ -655,7 +683,8 @@ export default function TeacherDashboard() {
                             </TableRow>
                           ))}
                         </TableBody>
-                      </Table>
+                        </Table>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -777,7 +806,9 @@ export default function TeacherDashboard() {
                     </p>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button className="w-full bg-info hover:bg-info/90">{t.startTest}</Button>
+                       <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-black font-semibold shadow-md">
+  {t.startTest}
+</Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
@@ -894,6 +925,18 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
           </Tabs>
+
+          {/* Student Progress Modal */}
+          {progressModalStudent && user && (
+            <StudentProgressModal
+              isOpen={!!progressModalStudent}
+              onClose={() => setProgressModalStudent(null)}
+              studentId={progressModalStudent.id}
+              studentName={progressModalStudent.name}
+              studentGrade={progressModalStudent.grade}
+              teacherId={user.id}
+            />
+          )}
 
           {/* Report Dialog */}
           {reportSession && (

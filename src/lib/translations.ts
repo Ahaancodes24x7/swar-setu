@@ -65,7 +65,8 @@ export interface TranslationStrings {
   flaggedStudents: string;
   testsThisWeek: string;
   linkedParents: string;
-  
+  studentProgress: string;
+
   // Parent Dashboard
   hereIsProgress: string;
   dayStreak: string;
@@ -206,7 +207,8 @@ const translations: Record<string, TranslationStrings> = {
     flaggedStudents: "Flagged Students",
     testsThisWeek: "Tests This Week",
     linkedParents: "Linked Parents",
-    
+    studentProgress: "Student Progress",
+
     // Parent Dashboard
     hereIsProgress: "Here's how your child is doing this week",
     dayStreak: "Day Streak!",
@@ -346,7 +348,8 @@ const translations: Record<string, TranslationStrings> = {
     flaggedStudents: "चिह्नित छात्र",
     testsThisWeek: "इस सप्ताह के परीक्षण",
     linkedParents: "लिंक किए गए अभिभावक",
-    
+    studentProgress: "छात्र प्रगति",
+
     // Parent Dashboard
     hereIsProgress: "इस सप्ताह आपके बच्चे की प्रगति",
     dayStreak: "दिन की लकीर!",
@@ -479,6 +482,7 @@ const translations: Record<string, TranslationStrings> = {
     flaggedStudents: "চিহ্নিত ছাত্র",
     testsThisWeek: "এই সপ্তাহের পরীক্ষা",
     linkedParents: "লিঙ্ক করা অভিভাবক",
+    studentProgress: "ছাত্রের অগ্রগতি",
     hereIsProgress: "এই সপ্তাহে আপনার সন্তানের অগ্রগতি",
     dayStreak: "দিনের ধারা!",
     totalPoints: "মোট পয়েন্ট",
@@ -600,6 +604,7 @@ const translations: Record<string, TranslationStrings> = {
     flaggedStudents: "குறிக்கப்பட்ட மாணவர்கள்",
     testsThisWeek: "இந்த வார சோதனைகள்",
     linkedParents: "இணைக்கப்பட்ட பெற்றோர்",
+    studentProgress: "மாணவர் முன்னேற்றம்",
     hereIsProgress: "இந்த வாரம் உங்கள் குழந்தையின் முன்னேற்றம்",
     dayStreak: "நாள் தொடர்!",
     totalPoints: "மொத்த புள்ளிகள்",

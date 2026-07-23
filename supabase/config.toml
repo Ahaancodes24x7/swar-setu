@@ -1,12 +1,20 @@
+<<<<<<< HEAD
 project_id = "cfmdqbedwjlkrittozxb"
 
 [functions.saathi-chat]
 verify_jwt = true
+=======
+project_id = "cysqnpvftbomwqonrarz"
+
+[functions.saathi-chat]
+verify_jwt = false
+>>>>>>> 49401bae22ff6d5beeb384cc388a986441501b76
 
 [functions.verify-parent-email]
 verify_jwt = false
 
 [functions.analyze-voice]
+<<<<<<< HEAD
 verify_jwt = true
 
 [functions.elevenlabs-scribe-token]
@@ -23,3 +31,21 @@ verify_jwt = true
 
 [functions.generate-perception-image]
 verify_jwt = true
+=======
+verify_jwt = false
+
+[functions.elevenlabs-scribe-token]
+verify_jwt = false
+
+[functions.elevenlabs-transcribe]
+verify_jwt = false
+
+[functions.analyze-perception]
+verify_jwt = false
+
+[functions.analyze-voice-practice]
+verify_jwt = false
+
+[functions.generate-perception-image]
+verify_jwt = false
+>>>>>>> 49401bae22ff6d5beeb384cc388a986441501b76

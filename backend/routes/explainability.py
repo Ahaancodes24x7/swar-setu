@@ -7,6 +7,8 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from ai.gemini_explainer import generate_parent_friendly_explanation
+from ai.session_adapter import extract_64d_feature_vector
+from screening import get_screening_engine, parse_covariates
 
 explainability_bp = Blueprint('explainability', __name__)
 
@@ -42,3 +44,43 @@ def explain():
             "success": False,
             "error": str(e)
         }), 500
+
+
+@explainability_bp.route('/explain/shap', methods=['GET', 'POST'])
+def shap_explanation():
+    """TreeSHAP contributions (log-odds) from the LightGBM screening models."""
+    try:
+        data = (request.get_json(silent=True) or {}) if request.method == 'POST' else {}
+        mode = (data.get("disorder_type") or "comprehensive").strip().lower()
+        mode = mode if mode in ("dyslexia", "dyscalculia", "dysgraphia") else "full"
+        vector = data.get("feature_vector") or (extract_64d_feature_vector(data) if data else [0.5] * 64)
+        cov, _ = parse_covariates(data)
+        res = get_screening_engine().predict(vector, cov, mode)
+        return jsonify({
+            "success": True,
+            "method": "TreeSHAP (Lundberg et al. 2020) on LightGBM log-odds",
+            "shap_attributions": {d: r["shap_attributions"] for d, r in res.items()},
+            "protective_features": {d: r["protective_features"] for d, r in res.items()},
+            "top_features": {d: r["top_shap_features"] for d, r in res.items()},
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@explainability_bp.route('/fairness-report', methods=['GET'])
+def fairness_report():
+    """Subgroup error rates of the deployed models on their held-out (synthetic) test split."""
+    try:
+        engine = get_screening_engine()
+        keys = ("fpr_english", "fpr_hindi", "tpr_english", "tpr_hindi", "fpr_age_7_8", "fpr_age_11_12")
+        report = {mode: {d: {k: round(m[k], 4) for k in keys} for d, m in per.items()}
+                  for mode, per in engine.bundle["validation_report"].items()}
+        return jsonify({
+            "success": True,
+            "model_id": engine.model_id,
+            "operating_point": "refer threshold (sensitivity >= 0.85 on validation)",
+            "data": "held-out split of the synthetic training cohort; not real-world fairness evidence",
+            "fairness_report": report,
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500

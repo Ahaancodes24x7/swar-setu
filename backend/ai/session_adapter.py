@@ -1,16 +1,229 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Tuple
+import numpy as np
+
+
+try:
+    from ai.feature_extractors import (
+        extract_dyslexia_features,
+        extract_dyscalculia_features,
+        extract_dysgraphia_features,
+        extract_unified_64d_features
+    )
+except ImportError:
+    from backend.ai.feature_extractors import (
+        extract_dyslexia_features,
+        extract_dyscalculia_features,
+        extract_dysgraphia_features,
+        extract_unified_64d_features
+    )
+
+
+def extract_16d_feature_vector(payload: Dict[str, Any], disorder_type: str) -> List[float]:
+    """
+    Extracts 16-D feature vector for a specific single disorder screening.
+    """
+    dt = (disorder_type or "").strip().lower()
+    student_age = payload.get("student_age", payload.get("age", 9))
+    if "calc" in dt:
+        vec = extract_dyscalculia_features(payload, student_age=student_age)
+    elif "graph" in dt:
+        vec = extract_dysgraphia_features(payload, student_age=student_age)
+    else:
+        vec = extract_dyslexia_features(payload, student_age=student_age)
+    return vec.tolist()
+
+
+def extract_64d_feature_vector(payload: Dict[str, Any], disorder_type: str | None = None) -> List[float]:
+    """
+    Maps incoming raw frontend task/game metrics into the exact 64-dimensional
+    normalized feature vector expected by the PyTorch ResidualTransformerClassifier model.
+    """
+    student_age = payload.get("student_age", payload.get("age", 9))
+    try:
+        vec = extract_unified_64d_features(payload, student_age=student_age)
+        return vec.tolist()
+    except Exception:
+        pass
+
+    session_data = build_ml_session_data(payload, disorder_type=disorder_type)
+    games = session_data.get("games", {})
+    vector = [0.5] * 64
+
+    # Extract all game statistics
+    accuracies = []
+    response_times = []
+    speeds = []
+    error_counts = []
+    phoneme_scores = []
+    drawing_tremors = []
+    drawing_pressures = []
+    drawing_straightness = []
+    drawing_smoothness = []
+    self_corrections = []
+    cognitive_loads = []
+    visual_scores = []
+
+    for game_name, game in games.items():
+        corr = game.get("correct_count", 0)
+        tot = max(1, game.get("total_count", 1))
+        accuracies.append(corr / tot)
+
+        rt = game.get("avg_response_time_ms", 2000)
+        if rt > 0:
+            response_times.append(rt)
+
+        sp = game.get("speed", 0.0)
+        if sp > 0:
+            speeds.append(sp)
+
+        error_counts.append(game.get("total_errors", 0))
+
+        if "phoneme_awareness_score" in game:
+            phoneme_scores.append(game["phoneme_awareness_score"])
+
+        if game.get("strokes"):
+            for st in game["strokes"]:
+                if isinstance(st, dict):
+                    drawing_tremors.append(st.get("tremor", 0.5))
+                    drawing_pressures.append(st.get("pressure", 0.5))
+                    drawing_straightness.append(st.get("straightness", 0.5))
+                    drawing_smoothness.append(st.get("smoothness", 0.5))
+
+        self_corrections.append(game.get("self_corrections", 0))
+        cognitive_loads.append(game.get("cognitive_load", 0.5))
+        visual_scores.append(game.get("visual_processing_score", 0.5))
+
+    # Summary statistics
+    avg_acc = float(np.mean(accuracies)) if accuracies else 0.5
+    avg_rt = float(np.mean(response_times)) if response_times else 2000.0
+    rt_std = float(np.std(response_times)) if len(response_times) > 1 else 300.0
+    avg_speed = float(np.mean(speeds)) if speeds else 25.0
+    tot_errors = sum(error_counts)
+    avg_phoneme = float(np.mean(phoneme_scores)) if phoneme_scores else avg_acc
+    avg_tremor = float(np.mean(drawing_tremors)) if drawing_tremors else 0.3
+    avg_pressure = float(np.mean(drawing_pressures)) if drawing_pressures else 0.5
+    avg_straight = float(np.mean(drawing_straightness)) if drawing_straightness else 0.7
+    avg_smooth = float(np.mean(drawing_smoothness)) if drawing_smoothness else 0.7
+    avg_cog_load = float(np.mean(cognitive_loads)) if cognitive_loads else 0.5
+    avg_vis_score = float(np.mean(visual_scores)) if visual_scores else 0.5
+    tot_self_corr = sum(self_corrections)
+
+    # Normalize response time, speed, and cognitive load to [0, 1]
+    norm_rt = max(0.0, min(1.0, avg_rt / 10000.0))
+    norm_speed = max(0.0, min(1.0, avg_speed / 150.0))
+    norm_rt_var = max(0.0, min(1.0, rt_std / 3000.0))
+    norm_errors = max(0.0, min(1.0, tot_errors / 20.0))
+    norm_cog_load = max(0.0, min(1.0, float(avg_cog_load)))
+
+    # --- GROUP 1: DYSLEXIA FEATURES (0..15) ---
+    vector[0] = norm_speed                       # Reading speed WPM
+    vector[1] = avg_acc                          # Reading accuracy
+    vector[2] = avg_phoneme                      # Phonological awareness
+    vector[3] = max(0.0, 1.0 - norm_errors)      # Word decoding accuracy
+    vector[4] = max(0.0, 1.0 - norm_rt_var)      # Reading fluency consistency
+    vector[5] = avg_vis_score                    # Visual-orthographic score
+    vector[6] = max(0.0, min(1.0, 1.0 - (tot_errors * 0.05))) # Letter confusion inverse
+    vector[7] = max(0.0, min(1.0, avg_acc * 0.9 + avg_phoneme * 0.1))
+    vector[8] = max(0.0, min(1.0, 1.0 - norm_rt))
+    vector[9] = max(0.0, min(1.0, avg_phoneme * 0.8 + 0.1))
+    vector[10] = max(0.0, min(1.0, avg_acc * 0.85 + 0.1))
+    vector[11] = max(0.0, min(1.0, 1.0 - norm_errors * 0.7))
+    vector[12] = max(0.0, min(1.0, norm_speed * 0.7 + avg_acc * 0.3))
+    vector[13] = max(0.0, min(1.0, avg_vis_score * 0.8 + 0.1))
+    vector[14] = max(0.0, min(1.0, avg_acc * 0.75 + 0.15))
+    vector[15] = max(0.0, min(1.0, 1.0 - norm_cog_load * 0.5))
+
+    # --- GROUP 2: DYSCALCULIA FEATURES (16..31) ---
+    vector[16] = avg_acc                         # Number sense accuracy
+    vector[17] = max(0.0, min(1.0, 1.0 - norm_rt)) # Math retrieval speed
+    vector[18] = max(0.0, min(1.0, 1.0 - norm_errors * 0.8)) # Calculation precision
+    vector[19] = avg_vis_score                   # Spatial-numerical processing
+    vector[20] = max(0.0, min(1.0, 1.0 - norm_rt_var * 0.8)) # Quantitative estimation fluency
+    vector[21] = max(0.0, min(1.0, avg_acc * 0.8 + 0.1))
+    vector[22] = max(0.0, min(1.0, 1.0 - norm_errors * 0.6))
+    vector[23] = max(0.0, min(1.0, norm_speed * 0.6 + avg_acc * 0.4))
+    vector[24] = max(0.0, min(1.0, avg_vis_score * 0.9))
+    vector[25] = max(0.0, min(1.0, avg_acc * 0.7 + 0.2))
+    vector[26] = max(0.0, min(1.0, 1.0 - norm_rt * 0.7))
+    vector[27] = max(0.0, min(1.0, avg_acc * 0.95))
+    vector[28] = max(0.0, min(1.0, 1.0 - norm_errors * 0.5))
+    vector[29] = max(0.0, min(1.0, norm_speed * 0.5 + avg_acc * 0.5))
+    vector[30] = max(0.0, min(1.0, avg_vis_score * 0.7 + 0.2))
+    vector[31] = max(0.0, min(1.0, 1.0 - norm_cog_load * 0.4))
+
+    # --- GROUP 3: DYSGRAPHIA FEATURES (32..47) ---
+    vector[32] = max(0.0, min(1.0, 1.0 - avg_tremor)) # Fine motor control (stroke tremor inverse)
+    vector[33] = avg_straight                    # Stroke straightness & alignment
+    vector[34] = avg_smooth                      # Kinematic smoothness
+    vector[35] = max(0.0, min(1.0, avg_pressure)) # Pen pressure regulation
+    vector[36] = max(0.0, min(1.0, norm_speed * 0.8 + 0.1)) # Graphomotor execution speed
+    vector[37] = max(0.0, min(1.0, 1.0 - norm_errors * 0.7)) # Spatial handwriting layout
+    vector[38] = max(0.0, min(1.0, avg_straight * 0.8 + avg_smooth * 0.2))
+    vector[39] = max(0.0, min(1.0, (1.0 - avg_tremor) * 0.8 + 0.1))
+    vector[40] = max(0.0, min(1.0, avg_smooth * 0.9))
+    vector[41] = max(0.0, min(1.0, avg_straight * 0.7 + 0.2))
+    vector[42] = max(0.0, min(1.0, (1.0 - avg_tremor) * 0.7 + avg_smooth * 0.3))
+    vector[43] = max(0.0, min(1.0, norm_speed * 0.7 + 0.15))
+    vector[44] = max(0.0, min(1.0, avg_straight * 0.85))
+    vector[45] = max(0.0, min(1.0, avg_smooth * 0.8 + 0.1))
+    vector[46] = max(0.0, min(1.0, (1.0 - avg_tremor) * 0.9))
+    vector[47] = max(0.0, min(1.0, 1.0 - norm_cog_load * 0.3))
+
+    # --- GROUP 4: GENERAL BEHAVIORAL FEATURES (48..63) ---
+    vector[48] = max(0.0, min(1.0, 1.0 - norm_cog_load)) # Cognitive load resilience
+    vector[49] = max(0.0, min(1.0, 1.0 - norm_rt_var))  # Sustained attention & focus
+    vector[50] = max(0.0, min(1.0, tot_self_corr / 10.0)) # Self-correction capability
+    vector[51] = max(0.0, min(1.0, avg_acc * 0.6 + (1.0 - norm_rt) * 0.4)) # Task completion efficiency
+    vector[52] = max(0.0, min(1.0, 1.0 - norm_errors * 0.5)) # Error recovery rate
+    vector[53] = max(0.0, min(1.0, norm_speed * 0.5 + 0.25)) # Processing pace consistency
+    vector[54] = max(0.0, min(1.0, avg_vis_score * 0.8 + 0.1))
+    vector[55] = max(0.0, min(1.0, (1.0 - norm_cog_load) * 0.8 + 0.1))
+    vector[56] = max(0.0, min(1.0, 1.0 - norm_rt_var * 0.5))
+    vector[57] = max(0.0, min(1.0, avg_acc * 0.8 + 0.1))
+    vector[58] = max(0.0, min(1.0, 1.0 - norm_errors * 0.4))
+    vector[59] = max(0.0, min(1.0, norm_speed * 0.4 + 0.3))
+    vector[60] = max(0.0, min(1.0, (1.0 - norm_cog_load) * 0.7 + 0.2))
+    vector[61] = max(0.0, min(1.0, 1.0 - norm_rt_var * 0.6))
+    vector[62] = max(0.0, min(1.0, avg_acc * 0.75 + 0.15))
+    vector[63] = max(0.0, min(1.0, 0.5 + (avg_acc - 0.5) * 0.5))
+
+    # Validate vector before returning
+    return validate_64d_vector(vector)
+
+
+def validate_64d_vector(vector: List[float]) -> List[float]:
+    """
+    Strict validation of the 64-dimensional feature vector.
+    Raises ValueError if length != 64 or if any element falls outside [0.0, 1.0].
+    """
+    if not isinstance(vector, list) and not isinstance(vector, np.ndarray):
+        raise ValueError(f"Feature vector must be a list or 1D array, got {type(vector)}")
+
+    vector_list = [float(v) for v in vector]
+
+    if len(vector_list) != 64:
+        raise ValueError(f"Feature vector validation failed: expected exactly 64 elements, got {len(vector_list)}")
+
+    out_of_bounds = []
+    for idx, val in enumerate(vector_list):
+        if val < 0.0 or val > 1.0:
+            out_of_bounds.append((idx, val))
+
+    if out_of_bounds:
+        raise ValueError(
+            f"Feature vector validation failed: {len(out_of_bounds)} element(s) outside normalized interval [0.0, 1.0]. "
+            f"First invalid entries: {out_of_bounds[:3]}"
+        )
+
+    return vector_list
 
 
 def build_ml_session_data(payload: Dict[str, Any], disorder_type: str | None = None) -> Dict[str, Any]:
     """
-    Convert incoming frontend payload into the ML-ready shape expected by models:
-    {
-      "games": {
-        "<game_name>": {...normalized game metrics...}
-      }
-    }
+    Convert incoming frontend payload into normalized ML session structure.
     """
     disorder = (disorder_type or payload.get("disorder_type") or "").strip().lower()
     raw_games = _extract_raw_games(payload)

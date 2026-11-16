@@ -45,8 +45,9 @@ def test_gating():
     assert res_complete.status_code == 200
     data_complete = res_complete.get_json()
     assert data_complete["unified_profile_ready"] is True
-    assert "comprehensive_summary" in data_complete["unified_report"]
-    print(f"     Overall Risk Level: {data_complete['unified_report']['comprehensive_summary']['overall_risk_level']}")
+    profile = data_complete["unified_report"]["full_profile"]
+    assert set(profile["disorders"]) == {"Dyslexia", "Dyscalculia", "Dysgraphia"}
+    print(f"     Overall Risk Level: {profile['overall_risk_level']}")
 
     print("==================================================")
     print("ALL UNIFIED GATING TESTS PASSED SUCCESSFULLY!")

@@ -2,8 +2,10 @@ import os
 import urllib.request
 import json
 
-SUPABASE_URL = "https://cfmdqbedwjlkrittozxb.supabase.co"
-SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbWRxYmVkd2psa3JpdHRvenhiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDcwNTc1OCwiZXhwIjoyMTAwMjgxNzU4fQ.x41HryVw9AoGBfKDuaz62-6whbqtsPgr45IJW7URQhs"
+from config import load_environment
+load_environment()
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://cfmdqbedwjlkrittozxb.supabase.co")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")  # set in .env; never commit it
 
 def check_connection():
     print("Checking Supabase connection...")

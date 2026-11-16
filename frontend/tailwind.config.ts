@@ -15,6 +15,12 @@ export default {
     extend: {
       colors: {
         border: "hsl(var(--border))",
+        hero: { DEFAULT: "hsl(var(--hero))", foreground: "hsl(var(--hero-foreground))" },
+        cream: "hsl(var(--cream))",
+        amber: "hsl(var(--amber))",
+        forest: { DEFAULT: "hsl(var(--forest))", foreground: "hsl(var(--forest-foreground))" },
+        leaf: "hsl(var(--leaf))",
+        wood: "hsl(var(--wood))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
@@ -68,7 +74,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["\"Plus Jakarta Sans\"", "Inter", "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {

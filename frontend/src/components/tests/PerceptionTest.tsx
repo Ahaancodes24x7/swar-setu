@@ -7,6 +7,7 @@ import { Mic, MicOff, ChevronRight, AlertCircle, CheckCircle, Loader2, ImageIcon
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { 
   getPerceptionQuestionsByGrade,
   type PerceptionQuestion,
@@ -53,6 +54,7 @@ async function generatePerceptionImage(prompt: string, imageUrl?: string, retryC
 }
 
 export function PerceptionTest({ studentName, studentGrade, studentId, onComplete }: PerceptionTestProps) {
+  const { language } = useLanguage();
   const { user } = useAuth();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<PerceptionResponse[]>([]);
@@ -63,6 +65,8 @@ export function PerceptionTest({ studentName, studentGrade, studentId, onComplet
   const [imageError, setImageError] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [transcribedText, setTranscribedText] = useState('');
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const startTimeRef = useRef<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -201,27 +205,34 @@ export function PerceptionTest({ studentName, studentGrade, studentId, onComplet
     }
   };
 
+  // Never submit placeholder text as the child's answer: on failure ask to retry or type instead
   const transcribeAudio = async (audioBlob: Blob) => {
+    setTranscribing(true);
+    setVoiceError(null);
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
-      
-      const { data, error } = await supabase.functions.invoke('elevenlabs-transcribe', {
+      formData.append("language", language.code);
+
+      const { data, error } = await supabase.functions.invoke('transcribe', {
         body: formData,
       });
-      
-      if (error) {
-        console.error("Transcription error:", error);
-        setTranscribedText("Voice recorded - click Submit to continue");
-      } else if (data?.text) {
-        setTranscribedText(data.text);
-        toast.success("Voice captured! Review and submit.");
+
+      if (!error && data?.text?.trim()) {
+        setTranscribedText(data.text.trim());
       } else {
-        setTranscribedText("Voice recorded - click Submit to continue");
+        if (error) console.error("Transcription error:", error);
+        setTranscribedText("");
+        setVoiceError(data?.silence
+          ? "We didn't hear anything. Try again, or type the answer below."
+          : "We couldn't catch that. Try again, or type the answer below.");
       }
     } catch (error) {
       console.error("Transcription error:", error);
-      setTranscribedText("Voice recorded - click Submit to continue");
+      setTranscribedText("");
+      setVoiceError("We couldn't catch that. Try again, or type the answer below.");
+    } finally {
+      setTranscribing(false);
     }
   };
 
@@ -293,13 +304,18 @@ export function PerceptionTest({ studentName, studentGrade, studentId, onComplet
         analysis_report: analysisReport
       }]);
 
-      if (error) throw error;
-
-      toast.success("Perception test completed!");
+      // A failed save must not strand the teacher on the last question: always finish the test
+      if (error) {
+        console.error("Error saving perception test:", error);
+        toast.error("Results could not be saved. Please check the connection and try again later.");
+      } else {
+        toast.success("Perception test completed!");
+      }
       onComplete({ responses: allResponses, analysis });
     } catch (error) {
-      console.error("Error saving perception test:", error);
-      toast.error("Failed to save results");
+      console.error("Perception analysis failed:", error);
+      toast.error("Something went wrong while finishing the test.");
+      onComplete({ responses: allResponses, analysis: analyzeResponsesLocally(allResponses) });
     } finally {
       setAnalyzing(false);
     }
@@ -406,7 +422,9 @@ export function PerceptionTest({ studentName, studentGrade, studentId, onComplet
       
       <CardContent className="space-y-6">
         {/* Image display - MANDATORY */}
-        <div className="aspect-video bg-muted rounded-xl overflow-hidden flex items-center justify-center border-2 border-dashed border-border">
+        <div className={currentImage && !generatingImage && !imageError
+          ? "mx-auto flex aspect-square w-full max-w-md items-center justify-center overflow-hidden rounded-xl border bg-muted"
+          : "flex aspect-video items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border bg-muted"}>
           {generatingImage ? (
             <div className="text-center p-8">
               <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary mb-3" />
@@ -493,10 +511,33 @@ export function PerceptionTest({ studentName, studentGrade, studentId, onComplet
               </Button>
             </div>
             
-            {transcribedText && (
-              <div className="bg-muted/50 rounded-lg p-4 text-center">
-                <p className="text-sm text-muted-foreground mb-3 italic">"{transcribedText}"</p>
-                <Button onClick={() => handleAnswer(transcribedText)} className="gap-2">
+            {transcribing && (
+              <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden="true" />
+                Listening to your answer…
+              </p>
+            )}
+
+            {voiceError && !transcribing && (
+              <p className="text-center text-sm text-destructive" role="alert">{voiceError}</p>
+            )}
+
+            {(transcribedText || voiceError) && !transcribing && !isRecording && (
+              <div className="space-y-3 rounded-lg bg-muted/50 p-4">
+                <label htmlFor="perception-answer" className="block text-sm font-medium">
+                  {voiceError ? "Type the answer" : "What we heard (you can correct it)"}
+                </label>
+                <textarea
+                  id="perception-answer"
+                  className="h-20 w-full resize-none rounded-lg border bg-background p-3 text-foreground focus:ring-2 focus:ring-primary"
+                  value={transcribedText}
+                  onChange={(e) => setTranscribedText(e.target.value)}
+                />
+                <Button
+                  onClick={() => { setVoiceError(null); handleAnswer(transcribedText); }}
+                  disabled={!transcribedText.trim() || !canProceed}
+                  className="w-full gap-2"
+                >
                   Submit Response
                   <ChevronRight className="h-4 w-4" />
                 </Button>

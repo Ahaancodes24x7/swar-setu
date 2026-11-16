@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { getAIPrediction } from "@/api/ai";
+import { getAIPrediction, type AssessmentPayload } from "@/api/ai";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import {
   getTestData,
   getQuestionsByGrade,
+  ITEM_BANK_VERSION,
   type TestMetrics,
   type ErrorPattern,
   type TestQuestion,
@@ -17,6 +18,9 @@ import {
 } from "@/lib/dsm5TestData";
 import { TestQuestion as TestQuestionComponent } from "./dsm5/TestQuestion";
 import { WorkingMemoryTest } from "./dsm5/WorkingMemoryTest";
+import { OralReadingFluency } from "./dsm5/OralReadingFluency";
+import { Dsm5SpecifierList, type Dsm5Specifier } from "./dsm5/Dsm5SpecifierList";
+import type { ReadingFluencyResult } from "@/lib/dsm5Fluency";
 import {
   Brain,
   Play,
@@ -37,7 +41,7 @@ interface DSM5DyslexiaTestProps {
   onComplete?: (results: any) => void;
 }
 
-type TestPhase = "intro" | "testing" | "analyzing" | "results";
+type TestPhase = "intro" | "testing" | "fluency" | "analyzing" | "results";
 
 interface SubTest {
   id: string;
@@ -128,6 +132,10 @@ export function DSM5DyslexiaTest({
     .reduce((sum, st) => sum + (st.questions?.length || 0), 0) + currentQuestionIndex;
   const overallProgress = totalQuestions > 0 ? (completedQuestions / totalQuestions) * 100 : 0;
 
+  // handleAnswer is declared before analyzeResults; call it through a ref to avoid a
+  // use-before-declaration error in the dependency array (it threw on every render)
+  const analyzeResultsRef = useRef<() => void>(() => {});
+
   const handleAnswer = useCallback((
     answer: string,
     responseTime: number,
@@ -194,11 +202,39 @@ export function DSM5DyslexiaTest({
         setCurrentSubTestIndex(curSubIdx + 1);
         setCurrentQuestionIndex(0);
       } else {
-        console.log("All subtests completed cleanly, starting analysis");
-        analyzeResults();
+        // last DSM-5 specifier subtest: oral reading fluency (word reading accuracy, reading rate)
+        setTestPhase("fluency");
       }
     }, 400);
-  }, [subTests, analyzeResults]);
+  }, [subTests]);
+
+  const taskStartTimeRef = useRef<number>(Date.now());
+  const fluencyRef = useRef<ReadingFluencyResult | null>(null);
+  const selfCorrectionCountRef = useRef<number>(0);
+
+  const computeAttentionScore = (responseTimes: number[]): number => {
+    if (responseTimes.length < 3) return 0.5;
+    const mean = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+    if (mean <= 0) return 0.5;
+    const variance = responseTimes.reduce((acc, t) => acc + Math.pow(t - mean, 2), 0) / responseTimes.length;
+    const cv = Math.sqrt(variance) / mean;
+    return Math.max(0.0, Math.min(1.0, 1.0 - cv));
+  };
+
+  const computeErrorRecovery = (answered: AnsweredQuestion[]): number => {
+    let errorIndices: number[] = [];
+    answered.forEach((item, idx) => {
+      if (!item.correct) errorIndices.push(idx);
+    });
+    if (errorIndices.length === 0) return 1.0;
+    let recoveries = 0;
+    for (const errIdx of errorIndices) {
+      if (errIdx + 1 < answered.length && answered[errIdx + 1].correct) {
+        recoveries++;
+      }
+    }
+    return recoveries / errorIndices.length;
+  };
 
   const analyzeResults = useCallback(() => {
     console.log("analyzeResults called");
@@ -210,6 +246,8 @@ export function DSM5DyslexiaTest({
       const currentMetrics = metricsRef.current;
       const allErrors = errorPatternsRef.current;
       const allAnswers = answeredQuestionsRef.current;
+      const taskEndTime = Date.now();
+      const elapsedSeconds = Math.max(1, (taskEndTime - taskStartTimeRef.current) / 1000);
 
       console.log("Metrics:", currentMetrics);
       console.log("Errors count:", allErrors.length);
@@ -232,6 +270,22 @@ export function DSM5DyslexiaTest({
       allErrors.forEach((e) => {
         errorTypeCounts[e.type] = (errorTypeCounts[e.type] || 0) + 1;
       });
+
+      // Reading rate comes from the timed oral reading passage (words correct per minute);
+      // if that subtest was skipped the rate is left out and treated as missing by the model.
+      const fluency = fluencyRef.current;
+
+      const phonemeQs = allAnswers.filter(a => a.subtest.toLowerCase().includes('phonol'));
+      const phonemeErrorCount = phonemeQs.filter(a => !a.correct).length;
+      const totalPhonemeItems = Math.max(1, phonemeQs.length);
+
+      const letterConfQs = allAnswers.filter(a => a.subtest.toLowerCase().includes('visual'));
+      const letterConfusionCount = letterConfQs.filter(a => !a.correct).length;
+      const totalLetterItems = Math.max(1, letterConfQs.length);
+
+      const responseTimeArray = allAnswers.map(a => a.responseTime * 1000); // convert seconds to ms
+      const correctCount = allAnswers.filter(a => a.correct).length;
+      const totalErrors = allAnswers.length - correctCount;
       
       let riskLevel: 'low' | 'moderate' | 'high' = 'low';
       const flaggedConditions: string[] = [];
@@ -260,6 +314,33 @@ export function DSM5DyslexiaTest({
         flaggedConditions.push('Reading Comprehension Difficulty');
       }
 
+      if (fluency?.belowExpected) {
+        flaggedConditions.push(fluency.accuracy < 0.9 ? 'Inaccurate Oral Reading' : 'Slow Reading Rate');
+        riskLevel = riskLevel === 'low' ? 'moderate' : 'high';
+      }
+
+      // DSM-5 specifiers for "with impairment in reading"
+      const decodingAcc = Math.min(currentMetrics.phonological?.accuracy ?? 100, currentMetrics.pseudoword?.accuracy ?? 100);
+      const dsm5Specifiers: Dsm5Specifier[] = [
+        {
+          name: 'Word reading accuracy',
+          status: decodingAcc < 70 || (fluency ? fluency.accuracy < 0.9 : false) ? 'below' : 'expected',
+          evidence: `Decoding ${Math.round(decodingAcc)}%` + (fluency ? `, passage word accuracy ${Math.round(fluency.accuracy * 100)}%` : ''),
+        },
+        fluency
+          ? {
+              name: 'Reading rate or fluency',
+              status: fluency.wcpm < fluency.norm.p25 && fluency.passageId.includes('-en-') ? 'below' : 'expected',
+              evidence: `${fluency.wcpm} words correct per minute` + (fluency.passageId.includes('-en-') ? ` (25th percentile ${fluency.norm.p25})` : ' (no Hindi norm; judged by the age-normed model)'),
+            }
+          : { name: 'Reading rate or fluency', status: 'not_measured', evidence: 'Oral reading subtest skipped' },
+        {
+          name: 'Reading comprehension',
+          status: (currentMetrics.comprehension?.accuracy ?? 100) < 70 ? 'below' : 'expected',
+          evidence: `${Math.round(currentMetrics.comprehension?.accuracy ?? 0)}% of comprehension questions`,
+        },
+      ];
+
       const analysisResult = {
         testType: 'dyslexia',
         overallScore: Math.round(isNaN(overallAccuracy) ? 0 : overallAccuracy),
@@ -271,29 +352,66 @@ export function DSM5DyslexiaTest({
         phonemeErrorRate: 100 - (currentMetrics.phonological?.accuracy || 0),
         pronunciationConsistency: currentMetrics.pseudoword?.accuracy || 0,
         answeredQuestions: allAnswers,
+        readingFluency: fluency,
+        dsm5Specifiers,
         summary: generateSummary(overallAccuracy, riskLevel, flaggedConditions),
         recommendations: generateRecommendations(riskLevel, flaggedConditions, errorTypeCounts),
       };
 
-      setResults(analysisResult);
-      setTestPhase("results");
-      console.log("Results phase set successfully");
-      onComplete?.(analysisResult);
+      // Construct standard AI games payload
+      const gamesPayload: Record<string, Record<string, unknown>> = {};
+      if (fluency) {
+        // first game carrying `wpm` is the one the feature extractor reads
+        gamesPayload.oral_reading = {
+          wpm: fluency.wcpm,
+          words_read: fluency.wordsAttempted,
+          words_correct: fluency.wordsCorrect,
+          time_seconds: fluency.seconds,
+          accuracy: Number(fluency.accuracy.toFixed(4)),
+          method: fluency.method,
+        };
+      }
+      gamesPayload.reading_fluency = {
+          accuracy: Number((overallAccuracy / 100).toFixed(4)),
+          phoneme_errors: phonemeErrorCount,
+          total_phonemes: totalPhonemeItems,
+          letter_confusions: letterConfusionCount,
+          letter_items: totalLetterItems,
+          pseudoword_accuracy: Number(((currentMetrics.pseudoword?.accuracy ?? 70) / 100).toFixed(4)),
+          response_times: responseTimeArray,
+          first_response_ms: responseTimeArray[0] || 1200,
+          self_corrections: selfCorrectionCountRef.current,
+          total_errors: totalErrors,
+          phonological_score: Number(((currentMetrics.phonological?.accuracy ?? 70) / 100).toFixed(4)),
+          memory_score: Number(((currentMetrics.memory?.accuracy ?? 70) / 100).toFixed(4)),
+          attention_score: Number(computeAttentionScore(responseTimeArray).toFixed(4)),
+          error_recovery: Number(computeErrorRecovery(allAnswers).toFixed(4)),
+          comprehension_score: Number(((currentMetrics.comprehension?.accuracy ?? 70) / 100).toFixed(4))
+      };
 
-      // Call AI prediction API (non-blocking)
-      const finalScore = analysisResult.overallScore;
-      const percentage = analysisResult.overallScore;
-      const answersArray = analysisResult.answeredQuestions;
-      getAIPrediction({
+      const aiPayload: AssessmentPayload = {
         disorder_type: "dyslexia",
-        score: finalScore,
-        percentage: percentage,
-        answers: answersArray || []
-      }).then((aiResult) => {
-        console.log("AI RESULT:", aiResult);
-      }).catch((err) => {
-        console.error("AI prediction error:", err);
-      });
+        student_id: studentId || "guest_student",
+        grade: gradeNum,
+        item_bank: ITEM_BANK_VERSION,
+        score: analysisResult.overallScore,
+        percentage: analysisResult.overallScore,
+        games: gamesPayload,
+        timing_data: {
+          start_time: new Date(taskStartTimeRef.current).toISOString(),
+          end_time: new Date(taskEndTime).toISOString(),
+          total_duration_seconds: elapsedSeconds
+        }
+      };
+      const completed = { ...analysisResult, aiPayload };
+      setResults(completed);
+      setTestPhase("results");
+      if (onComplete) {
+        // the host (teacher dashboard) runs the screening model once and shows its result
+        onComplete(completed);
+      } else {
+        getAIPrediction(aiPayload).catch((err) => console.error("AI prediction error:", err));
+      }
       } catch (error) {
         console.error("Analysis failed with error:", error);
         console.error("Error details:", {
@@ -305,6 +423,7 @@ export function DSM5DyslexiaTest({
       }
     }, 0);
   }, [onComplete]);
+  analyzeResultsRef.current = analyzeResults;
 
   const generateSummary = (accuracy: number, risk: string, conditions: string[]): string => {
     const safeAccuracy = isNaN(accuracy) ? 0 : accuracy;
@@ -359,7 +478,7 @@ export function DSM5DyslexiaTest({
           <CardDescription>
             {studentName} • {studentGrade}
           </CardDescription>
-          <Badge variant="outline" className="mx-auto mt-2">DSM-5 Compliant • Cognitive Assessment</Badge>
+          <Badge variant="outline" className="mx-auto mt-2">Aligned with DSM-5 reading specifiers • Screening</Badge>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/30">
@@ -370,7 +489,7 @@ export function DSM5DyslexiaTest({
           <div className="bg-muted/50 rounded-lg p-4">
             <h3 className="font-semibold mb-3">This assessment includes:</h3>
             <div className="space-y-2">
-              {subTests.map((st, idx) => (
+              {[...subTests, { id: 'fluency', name: 'Oral Reading Fluency', icon: <BookOpen className="h-5 w-5" />, description: 'One minute of reading aloud (words correct per minute)' }].map((st, idx) => (
                 <div key={st.id} className="flex items-center gap-3 text-sm">
                   <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0">
                     {idx + 1}
@@ -386,7 +505,7 @@ export function DSM5DyslexiaTest({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center p-3 rounded-lg bg-secondary/10 border border-secondary/30">
-              <p className="text-2xl font-bold text-secondary">{subTests.length}</p>
+              <p className="text-2xl font-bold text-secondary">{subTests.length + 1}</p>
               <p className="text-xs text-muted-foreground">Subtests</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/30">
@@ -462,6 +581,25 @@ export function DSM5DyslexiaTest({
     );
   }
 
+  if (testPhase === "fluency") {
+    return (
+      <div className="space-y-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <Badge variant="outline" className="flex items-center gap-2"><BookOpen className="h-4 w-4" />Oral Reading Fluency</Badge>
+            <span className="text-sm text-muted-foreground">Final subtest</span>
+          </div>
+          <Progress value={100} className="h-2" />
+        </div>
+        <OralReadingFluency
+          lang={language.code}
+          grade={gradeNum}
+          onComplete={(r) => { fluencyRef.current = r; analyzeResultsRef.current(); }}
+        />
+      </div>
+    );
+  }
+
   // Render analyzing phase
   if (testPhase === "analyzing") {
     return (
@@ -525,6 +663,10 @@ export function DSM5DyslexiaTest({
             ))}
           </div>
 
+          {results.dsm5Specifiers && (
+            <Dsm5SpecifierList title="DSM-5: specific learning disorder with impairment in reading" specifiers={results.dsm5Specifiers} />
+          )}
+
           {results.flaggedConditions?.length > 0 && (
             <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30">
               <p className="font-semibold text-destructive mb-2">Flagged Indicators:</p>
@@ -550,25 +692,33 @@ export function DSM5DyslexiaTest({
               
               <div>
                 <p className="font-medium text-sm mb-2">Testing Criteria & DSM-5 Alignment:</p>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
                   <li>Phonological awareness: Ability to identify and manipulate sounds in language</li>
                   <li>Pseudoword decoding: Reading non-real words to test pure decoding skill</li>
                   <li>Visual processing: Letter/word reversal detection (b/d, p/q confusion)</li>
                   <li>Reading comprehension: Understanding meaning from short passages</li>
                   <li>Working memory: Verbal sequence recall (digit/letter spans)</li>
+                  <li>Oral reading fluency: Words read correctly per minute from a grade-level passage (DSM-5 reading rate and accuracy)</li>
                 </ul>
               </div>
 
               {/* Question-by-Question Breakdown */}
               {results.answeredQuestions?.length > 0 && (
                 <div>
-                  <p className="font-medium text-sm mb-2">Question-by-Question Results:</p>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <details className="group rounded-lg border bg-background/60">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium">
+                    <span>Question-by-Question Results</span>
+                    <span className="shrink-0 whitespace-nowrap text-xs font-normal text-muted-foreground">
+                      {results.answeredQuestions.filter((q: AnsweredQuestion) => q.correct).length} of {results.answeredQuestions.length} correct
+                      <span className="ml-2 inline-block transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
+                    </span>
+                  </summary>
+                  <div className="space-y-2 border-t p-3">
                     {results.answeredQuestions.map((q: AnsweredQuestion, i: number) => (
                       <div key={i} className={`p-2 rounded text-xs border ${q.correct ? 'border-success/30 bg-success/5' : 'border-destructive/30 bg-destructive/5'}`}>
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                           <Badge variant="outline" className="text-[10px]">{q.subtest}</Badge>
-                          <span className={q.correct ? 'text-success' : 'text-destructive'}>
+                          <span className={`shrink-0 ${q.correct ? 'text-success' : 'text-destructive'}`}>
                             {q.correct ? '✓ Correct' : '✗ Incorrect'} ({q.responseTime.toFixed(1)}s)
                           </span>
                         </div>
@@ -577,20 +727,17 @@ export function DSM5DyslexiaTest({
                       </div>
                     ))}
                   </div>
+                  </details>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-muted/30">
-            <p className="font-semibold mb-2">Summary:</p>
-            <p className="text-sm text-muted-foreground">{results.summary}</p>
-          </div>
 
           {results.recommendations?.length > 0 && (
             <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
               <p className="font-semibold mb-2">Recommendations:</p>
-              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
                 {results.recommendations.map((r: string, i: number) => (
                   <li key={i}>{r}</li>
                 ))}

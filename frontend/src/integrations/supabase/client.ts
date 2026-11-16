@@ -15,3 +15,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+// Edge functions are served by the SwarSetu backend (backend/routes/functions.py) at the same
+// paths Supabase uses. Set VITE_FUNCTIONS_URL to use deployed Supabase functions instead.
+export const FUNCTIONS_URL =
+  import.meta.env.VITE_FUNCTIONS_URL ||
+  `${import.meta.env.VITE_AI_API_BASE_URL || window.location.origin}/functions/v1`;
+(supabase as unknown as { functionsUrl: URL }).functionsUrl = new URL(FUNCTIONS_URL);

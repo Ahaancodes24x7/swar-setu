@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, FUNCTIONS_URL } from "@/integrations/supabase/client";
 import { MessageCircle, Send, X, Loader2, Sparkles, Mic, MicOff, Volume2, AlertTriangle } from "lucide-react";
-import { speakTextElevenLabs } from "@/lib/elevenlabsVoice";
+import { speakText } from "@/lib/voice";
 
 interface Message {
   role: "user" | "assistant";
@@ -51,8 +51,8 @@ export function SaathiChatbot({ studentName = "Friend", studentId, isOpen, onClo
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/saathi-chat`;
-  const VOICE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-voice-practice`;
+  const CHAT_URL = `${FUNCTIONS_URL}/saathi-chat`;
+  const VOICE_URL = `${FUNCTIONS_URL}/analyze-voice-practice`;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -341,7 +341,7 @@ export function SaathiChatbot({ studentName = "Friend", studentId, isOpen, onClo
   const hasMicSupport = typeof navigator !== "undefined" && navigator.mediaDevices;
 
   return (
-    <div className="fixed bottom-4 right-4 w-80 md:w-96 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 animate-fade-in">
+    <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 w-[min(20rem,calc(100vw-2rem))] md:w-96 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50 animate-fade-in">
       {/* Header */}
       <div className="gradient-hero p-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
@@ -386,9 +386,9 @@ export function SaathiChatbot({ studentName = "Friend", studentId, isOpen, onClo
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                   {msg.role === "assistant" && (
                     <button
-                      onClick={() => speakTextElevenLabs(msg.content)}
+                      onClick={() => speakText(msg.content, language.code)}
                       className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
-                      title="Listen with ElevenLabs Voice"
+                      title="Listen"
                     >
                       <Volume2 className="h-3 w-3" /> Listen
                     </button>

@@ -7,11 +7,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Globe, Menu, X, ChevronDown } from "lucide-react";
+import { Globe, Menu, X, ChevronDown, ArrowUpRight } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useLanguage, languages } from "@/contexts/LanguageContext";
-import logolight from "@/assets/logolight.png";
-import logodark from "@/assets/logodark.png";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useTranslations } from "@/hooks/useTranslations";
 
 export function Header() {
@@ -25,38 +24,33 @@ export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const { language, setLanguage } = useLanguage();
   const location = useLocation();
+  // on the home page the header floats over the cobalt hero, like the artwork's nav
+  const onHero = location.pathname === "/";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+    <header
+      className={
+        onHero
+          ? "absolute top-0 z-50 w-full text-hero-foreground"
+          : "sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      }
+    >
+      <div className={`container mx-auto flex items-center justify-between px-4 ${onHero ? "h-20" : "h-16"}`}>
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2">
-  
-           {/* Light mode logo */}
-              <img
-                 src={logolight}
-                 alt="SWARSETU Logo"
-                 className="h-12 w-auto block dark:hidden"
-              />
-              {/* Dark mode logo */}
-              <img
-                 src={logodark}
-                 alt="SWARSETU Logo Dark"
-                 className="h-12 w-auto hidden dark:block"
-              />
-
+        <Link to="/" className="flex items-center gap-2 transition-transform hover:scale-105 hover:-rotate-1" data-tour="brand">
+          <BrandLogo tone={onHero ? "dark" : "auto"} />
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-8 md:flex" data-tour="nav">
           {navLinks.map((link) => (
             <Link
               key={link.path}
               to={link.path}
-              className={`text-sm font-medium transition-colors hover:text-primary ${
-                location.pathname === link.path
-                  ? "text-primary"
-                  : "text-muted-foreground"
+              className={`relative text-sm font-medium transition-colors after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:rounded-full after:bg-accent after:transition-transform hover:after:scale-x-100 ${
+                onHero
+                  ? location.pathname === link.path ? "text-hero-foreground after:scale-x-100" : "text-hero-foreground/80 hover:text-hero-foreground"
+                  : location.pathname === link.path ? "text-primary after:scale-x-100" : "text-muted-foreground hover:text-primary"
               }`}
             >
               {link.label}
@@ -69,7 +63,7 @@ export function Header() {
           {/* Language Selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className={`gap-2 ${onHero ? "hover:bg-white/10 hover:text-hero-foreground" : ""}`} data-tour="language">
                 <Globe className="h-4 w-4" />
                 <span>{language.native}</span>
                 <ChevronDown className="h-3 w-3" />
@@ -91,11 +85,20 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <ThemeToggle />
+          <span data-tour="theme" className={onHero ? "[&_button:hover]:bg-white/10 [&_button:hover]:text-hero-foreground" : ""}><ThemeToggle /></span>
 
-          <Button asChild variant="hero" size="default">
-            <Link to="/login">{t.getStarted}</Link>
-          </Button>
+          {onHero ? (
+            <Button asChild variant="outline" className="group border border-hero-foreground/80 text-hero-foreground hover:bg-hero-foreground hover:text-hero">
+              <Link to="/login">
+                {t.getStarted}
+                <ArrowUpRight className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild variant="hero" size="default">
+              <Link to="/login">{t.getStarted}</Link>
+            </Button>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -110,7 +113,7 @@ export function Header() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="md:hidden border-t border-border bg-background animate-fade-in">
+        <div className="md:hidden border-t border-border bg-background text-foreground animate-fade-in rounded-b-2xl shadow-lg">
           <nav className="container mx-auto flex flex-col gap-2 px-4 py-4">
             {navLinks.map((link) => (
               <Link

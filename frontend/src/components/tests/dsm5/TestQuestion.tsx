@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle, Volume2, Mic, MicOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { TestQuestion as TQuestion, ErrorPattern } from "@/lib/dsm5TestData";
 
 interface TestQuestionProps {
@@ -25,6 +26,7 @@ export function TestQuestion({
   showStimulus = true,
   stimulusDisplayTime,
 }: TestQuestionProps) {
+  const { language } = useLanguage();
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [stimulusVisible, setStimulusVisible] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState(question.timeLimit || 30);
@@ -253,11 +255,12 @@ export function TestQuestion({
       // Try external API first
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
+      formData.append("language", language.code);
       
       console.log("Sending audio blob:", audioBlob.size, "bytes");
       
       try {
-        const { data, error } = await supabase.functions.invoke("elevenlabs-transcribe", {
+        const { data, error } = await supabase.functions.invoke("transcribe", {
           body: formData,
         });
         

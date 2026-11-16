@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, FUNCTIONS_URL } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface VoiceAnalysisResult {
@@ -132,7 +132,7 @@ export function useVoicePractice(studentId?: string) {
         formData.append("language", "en"); // Can be dynamic
 
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-voice-practice`,
+          `${FUNCTIONS_URL}/analyze-voice-practice`,
           {
             method: "POST",
             headers: {

@@ -1,52 +1,56 @@
 import { Link } from "react-router-dom";
-import { useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowRight,
-  Sparkles,
-} from "lucide-react";
-import { ImaginativeHeroBackground } from "@/components/home/ImaginativeHeroBackground";
+import { ArrowDown, ArrowUpRight } from "lucide-react";
+import { HeroPath } from "@/components/home/HeroPath";
 
 export default function Index() {
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev || "";
-    };
-  }, []);
   return (
     <Layout hideFooter={true}>
-      {/* Hero Section */}
-      <section className="relative overflow-hidden min-h-screen flex items-center justify-center">
-        <ImaginativeHeroBackground />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary mb-8 animate-fade-in">
-              <Sparkles className="h-3.5 w-3.5" />
-              DETECT • SUPPORT • INCLUDE
-            </div>
-            <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold tracking-tighter text-foreground mb-6 animate-fade-in leading-[1.1]" style={{ animationDelay: "0.1s" }}>
-              Welcome to{" "}
-              <span className="block mt-4 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent animate-pulse">
-                SWARSETU
-              </span>
+      <section className="relative overflow-hidden bg-hero text-hero-foreground">
+        {/* soft light from the upper right, like the artwork */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_70%_30%,hsl(222_85%_45%/0.55),transparent_60%)]" />
+
+        <div className="container relative mx-auto grid min-h-[100svh] items-center gap-6 px-4 pb-24 pt-28 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-0">
+          <div className="relative z-10 max-w-xl">
+            <h1 className="animate-fade-in text-6xl font-extrabold leading-[0.95] tracking-tight sm:text-7xl xl:text-8xl">
+              Room for <br />every mind<span className="text-accent">.</span>
             </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-3xl mx-auto animate-fade-in leading-relaxed font-medium" style={{ animationDelay: "0.2s" }}>
-              AI-Powered learning difference assessment platform for every child's success
+            <p className="animate-fade-in mt-6 text-lg sm:text-xl text-hero-foreground/90" style={{ animationDelay: "0.1s" }}>
+              A clearer start for children who learn differently.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
-              <Button asChild size="lg" className="rounded-lg font-semibold px-8 py-6 text-base">
-                <Link to="/login" className="gap-2">
-                  Get Started Free
-                  <ArrowRight className="h-5 w-5" />
+            <div className="animate-fade-in mt-10" style={{ animationDelay: "0.2s" }}>
+              <Button
+                asChild
+                size="xl"
+                className="group rounded-md bg-cream px-8 text-hero shadow-lg hover:bg-white hover:shadow-glow"
+                data-tour="hero-cta"
+              >
+                <Link to="/login">
+                  Discover Swar-Setu
+                  <ArrowUpRight className="!size-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="rounded-lg font-semibold px-8 py-6 text-base">
-                <Link to="/learn-more">Learn How It Works</Link>
-              </Button>
+              <p className="mt-3 text-sm text-hero-foreground/80">
+                Early learning support ·{" "}
+                <Link to="/learn-more" className="underline decoration-accent decoration-2 underline-offset-4 hover:text-accent">
+                  how it works
+                </Link>
+              </p>
             </div>
+          </div>
+
+          <div className="relative -mx-4 sm:mx-0 lg:-mr-16">
+            <HeroPath />
+          </div>
+        </div>
+
+        <div className="container absolute inset-x-0 bottom-0 mx-auto px-4">
+          <div className="flex items-center justify-between gap-4 border-t border-hero-foreground/30 py-5 text-sm">
+            <span>Different ways of learning. A shared way forward.</span>
+            <Link to="/learn-more" className="group hidden shrink-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] hover:text-accent sm:flex">
+              Explore how it works <ArrowDown className="h-4 w-4 transition-transform group-hover:translate-y-1" />
+            </Link>
           </div>
         </div>
       </section>

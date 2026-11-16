@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useScribe } from "@elevenlabs/react";
-import { getAIPrediction } from "@/api/ai";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,12 +58,12 @@ export function VoiceTest({ studentName, studentGrade, studentId, onComplete }: 
   const [fullTranscription, setFullTranscription] = useState("");
   const [results, setResults] = useState<TestResults | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
   const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const scribe = useScribe({
-    modelId: "scribe_v2_realtime",
+  // Self-hosted Whisper transcription (backend /functions/v1/transcribe)
+  const scribe = useSpeechToText({
+    language: language.code,
     onPartialTranscript: (data) => {
       setTranscription(data.text);
     },
@@ -72,7 +71,9 @@ export function VoiceTest({ studentName, studentGrade, studentId, onComplete }: 
       setFullTranscription((prev) => prev + " " + data.text);
       setTranscription("");
     },
+    onError: (msg) => console.warn("Transcription error:", msg),
   });
+  const audioLevel = scribe.level;
 
   const currentPrompts = testPrompts[currentTestType];
   const currentPrompt = currentPrompts[currentPromptIndex];
@@ -80,14 +81,7 @@ export function VoiceTest({ studentName, studentGrade, studentId, onComplete }: 
   const startRecording = useCallback(async () => {
     setIsConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
-      
-      if (error || !data?.token) {
-        throw new Error(error?.message || "Failed to get transcription token");
-      }
-
       await scribe.connect({
-        token: data.token,
         microphone: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -145,7 +139,8 @@ export function VoiceTest({ studentName, studentGrade, studentId, onComplete }: 
 
   const analyzeResults = async () => {
     setTestPhase("analyzing");
-    await scribe.disconnect();
+    // disconnect() resolves with the complete transcript, including the final segment
+    const fullTranscription = await scribe.disconnect();
 
     try {
       const expectedTexts = [
@@ -160,7 +155,7 @@ export function VoiceTest({ studentName, studentGrade, studentId, onComplete }: 
           expectedText: expectedTexts,
           testType: "reading",
           grade: studentGrade,
-          language: language.elevenLabsCode,
+          language: language.code,
         },
       });
 
@@ -173,22 +168,9 @@ export function VoiceTest({ studentName, studentGrade, studentId, onComplete }: 
 
       setResults(analysisResults);
       setTestPhase("results");
+      // The voice practice is scored by the analyze-voice function; it carries no measurements
+      // for the screening model, so no (empty) model call is made here.
       onComplete?.(analysisResults);
-
-      // Call AI prediction API (non-blocking)
-      const finalScore = analysisResults.overallScore;
-      const percentage = analysisResults.overallScore;
-      const answersArray = [];
-      getAIPrediction({
-        disorder_type: "dyslexia",
-        score: finalScore,
-        percentage: percentage,
-        answers: answersArray || []
-      }).then((aiResult) => {
-        console.log("AI RESULT:", aiResult);
-      }).catch((err) => {
-        console.error("AI prediction error:", err);
-      });
     } catch (error) {
       console.error("Analysis failed:", error);
       toast.error("Failed to analyze results. Please try again.");
@@ -280,17 +262,6 @@ export function VoiceTest({ studentName, studentGrade, studentId, onComplete }: 
     });
   };
 
-  // Update audio level visualization
-  useEffect(() => {
-    if (scribe.isConnected) {
-      const interval = setInterval(() => {
-        setAudioLevel(Math.random() * 60 + 20);
-      }, 200);
-      return () => clearInterval(interval);
-    } else {
-      setAudioLevel(0);
-    }
-  }, [scribe.isConnected]);
 
   if (testPhase === "intro") {
     return (

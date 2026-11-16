@@ -4,21 +4,20 @@ export interface Language {
   code: string;
   name: string;
   native: string;
-  elevenLabsCode: string; // ElevenLabs language code
 }
 
 export const languages: Language[] = [
-  { code: "en", name: "English", native: "English", elevenLabsCode: "eng" },
-  { code: "hi", name: "Hindi", native: "हिन्दी", elevenLabsCode: "hin" },
-  { code: "bn", name: "Bengali", native: "বাংলা", elevenLabsCode: "ben" },
-  { code: "te", name: "Telugu", native: "తెలుగు", elevenLabsCode: "tel" },
-  { code: "mr", name: "Marathi", native: "मराठी", elevenLabsCode: "mar" },
-  { code: "ta", name: "Tamil", native: "தமிழ்", elevenLabsCode: "tam" },
-  { code: "gu", name: "Gujarati", native: "ગુજરાતી", elevenLabsCode: "guj" },
-  { code: "kn", name: "Kannada", native: "ಕನ್ನಡ", elevenLabsCode: "kan" },
-  { code: "ml", name: "Malayalam", native: "മലയാളം", elevenLabsCode: "mal" },
-  { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ", elevenLabsCode: "pan" },
-  { code: "or", name: "Odia", native: "ଓଡ଼ିଆ", elevenLabsCode: "ori" },
+  { code: "en", name: "English", native: "English" },
+  { code: "hi", name: "Hindi", native: "हिन्दी" },
+  { code: "bn", name: "Bengali", native: "বাংলা" },
+  { code: "te", name: "Telugu", native: "తెలుగు" },
+  { code: "mr", name: "Marathi", native: "मराठी" },
+  { code: "ta", name: "Tamil", native: "தமிழ்" },
+  { code: "gu", name: "Gujarati", native: "ગુજરાતી" },
+  { code: "kn", name: "Kannada", native: "ಕನ್ನಡ" },
+  { code: "ml", name: "Malayalam", native: "മലയാളം" },
+  { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
+  { code: "or", name: "Odia", native: "ଓଡ଼ିଆ" },
 ];
 
 interface LanguageContextType {

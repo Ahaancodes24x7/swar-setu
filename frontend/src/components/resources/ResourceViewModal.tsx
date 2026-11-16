@@ -137,6 +137,7 @@ export function ResourceViewModal({
               <div className="space-y-2">
                 {content.checklist.map((item, i) => (
                   <div
+                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleChecklist(i); } }}
                     key={i}
                     onClick={() => toggleChecklist(i)}
                     className={`flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer ${

@@ -36,10 +36,11 @@ export function ParentAuthForm() {
     const cleanEmail = email.toLowerCase().trim();
 
     try {
+      // Multi-tier link verification
       let isLinked = false;
       let studentName = "";
 
-      // 1. Try Deno Edge Function
+      // Tier 1: Try Edge Function
       try {
         const { data: verifyResult, error: verifyError } = await supabase.functions.invoke("verify-parent-email", {
           body: { email: cleanEmail },
@@ -49,10 +50,10 @@ export function ParentAuthForm() {
           studentName = verifyResult.studentName;
         }
       } catch (e) {
-        console.warn("Edge function check failed, falling back to direct DB & local cache:", e);
+        console.warn("Edge function check bypassed:", e);
       }
 
-      // 2. Direct DB query fallback
+      // Tier 2: Direct DB query (case insensitive ilike)
       if (!isLinked) {
         try {
           const { data: directStudents } = await supabase
@@ -66,11 +67,11 @@ export function ParentAuthForm() {
             studentName = directStudents[0].name;
           }
         } catch (e) {
-          console.warn("Direct DB check error:", e);
+          console.warn("Direct DB check warning:", e);
         }
       }
 
-      // 3. Local storage fallback
+      // Tier 3: Local storage fallback
       if (!isLinked) {
         try {
           const localData = localStorage.getItem("swar_setu_local_students_v1");
@@ -85,11 +86,12 @@ export function ParentAuthForm() {
             }
           }
         } catch (e) {
-          console.warn("Local storage check error:", e);
+          console.warn("Local storage check warning:", e);
         }
       }
 
-      if (!isLinked) {
+      // For sign up mode, require a linked student; for sign in mode, allow trying password auth
+      if (!isLinked && isSignUp) {
         toast.error("This email is not linked to any student. Please contact your child's teacher.");
         setLoading(false);
         return;
@@ -103,7 +105,7 @@ export function ParentAuthForm() {
           options: {
             data: {
               role: "parent",
-              full_name: `Parent of ${studentName}`,
+              full_name: studentName ? `Parent of ${studentName}` : "Parent",
             },
           },
         });
@@ -118,10 +120,14 @@ export function ParentAuthForm() {
         } else {
           // Link parent_id if user object exists
           if (signUpData?.user) {
-            await supabase
-              .from("students")
-              .update({ parent_id: signUpData.user.id })
-              .ilike("parent_email", cleanEmail);
+            try {
+              await supabase
+                .from("students")
+                .update({ parent_id: signUpData.user.id })
+                .ilike("parent_email", cleanEmail);
+            } catch (e) {
+              console.warn("Could not update parent_id in DB:", e);
+            }
           }
           toast.success("Account created successfully!");
           navigate("/dashboard/parent");
@@ -142,10 +148,14 @@ export function ParentAuthForm() {
         } else {
           // Link parent_id if user object exists
           if (signInData?.user) {
-            await supabase
-              .from("students")
-              .update({ parent_id: signInData.user.id })
-              .ilike("parent_email", cleanEmail);
+            try {
+              await supabase
+                .from("students")
+                .update({ parent_id: signInData.user.id })
+                .ilike("parent_email", cleanEmail);
+            } catch (e) {
+              console.warn("Could not update parent_id in DB:", e);
+            }
           }
           toast.success("Signed in successfully!");
           navigate("/dashboard/parent");

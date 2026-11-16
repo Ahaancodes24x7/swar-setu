@@ -35,7 +35,7 @@ interface PrincipalReportData {
 
 const LOGO_SVG = `<svg width="180" height="36" viewBox="0 0 180 36" xmlns="http://www.w3.org/2000/svg">
   <text x="0" y="28" font-family="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" font-size="28" font-weight="bold">
-    <tspan fill="#8b22d6">SWAR</tspan><tspan fill="#f97316">SETU</tspan>
+    <tspan fill="#062a8c">SWAR</tspan><tspan fill="#f97316">SETU</tspan>
   </text>
 </svg>`;
 
@@ -51,7 +51,7 @@ const SHARED_STYLES = `
   }
   .header { 
     text-align: center; 
-    border-bottom: 3px solid #8b22d6; 
+    border-bottom: 3px solid #062a8c; 
     padding-bottom: 20px; 
     margin-bottom: 30px; 
   }
@@ -62,7 +62,7 @@ const SHARED_STYLES = `
   .section-title { 
     font-size: 15px; 
     font-weight: 600; 
-    color: #8b22d6; 
+    color: #062a8c; 
     border-bottom: 1px solid #e5e7eb; 
     padding-bottom: 8px; 
     margin-bottom: 15px; 
@@ -72,7 +72,7 @@ const SHARED_STYLES = `
   .info-value { font-size: 14px; font-weight: 500; }
   .score-box { 
     text-align: center; 
-    background: linear-gradient(135deg, #8b22d6 0%, #a855f7 100%); 
+    background: linear-gradient(135deg, #062a8c 0%, #2f5bd3 100%); 
     color: white; 
     padding: 25px; 
     border-radius: 12px; 
@@ -87,7 +87,7 @@ const SHARED_STYLES = `
     border-radius: 8px; 
     text-align: center; 
   }
-  .metric-value { font-size: 24px; font-weight: bold; color: #8b22d6; }
+  .metric-value { font-size: 24px; font-weight: bold; color: #062a8c; }
   .metric-label { font-size: 12px; color: #6b7280; }
   .risk-badge { 
     display: inline-block; 
@@ -140,7 +140,7 @@ const SHARED_STYLES = `
   }
   .progress-fill { 
     height: 100%; 
-    background: linear-gradient(90deg, #8b22d6, #a855f7); 
+    background: linear-gradient(90deg, #062a8c, #2f5bd3); 
     border-radius: 4px; 
   }
   .question-row { 
@@ -173,7 +173,7 @@ const SHARED_STYLES = `
   td { padding: 10px; border-bottom: 1px solid #f3f4f6; }
   .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
   .stat-card { text-align: center; padding: 16px; background: #f9fafb; border-radius: 10px; }
-  .stat-value { font-size: 28px; font-weight: bold; color: #8b22d6; }
+  .stat-value { font-size: 28px; font-weight: bold; color: #062a8c; }
   .stat-label { font-size: 11px; color: #6b7280; margin-top: 4px; }
   @media print {
     body { padding: 20px; }
@@ -227,7 +227,7 @@ export function generatePdfReport(data: ReportData): void {
             <div class="metric-card" style="text-align:left;">
               <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
                 <span style="font-size:13px;font-weight:600;text-transform:capitalize;">${st.id.replace(/_/g, " ")}</span>
-                <span style="font-weight:bold;color:#8b22d6;">${Math.round(st.accuracy)}%</span>
+                <span style="font-weight:bold;color:#062a8c;">${Math.round(st.accuracy)}%</span>
               </div>
               <div class="progress-bar"><div class="progress-fill" style="width:${st.accuracy}%"></div></div>
               <div style="font-size:11px;color:#6b7280;margin-top:4px;">${st.errorCount} errors • ${st.avgResponseTime.toFixed(1)}s avg</div>
@@ -417,7 +417,7 @@ export function generatePrincipalPdfReport(data: PrincipalReportData): void {
             <span style="font-size:14px;font-weight:500;">${c.cohort}</span>
             <span style="font-size:13px;color:#6b7280;">${c.count} students (${c.percentage}%)</span>
           </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${c.percentage}%;background:${c.cohort === 'High Performers' ? '#10b981' : c.cohort === 'Needs Support' ? '#dc2626' : '#8b22d6'};"></div></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${c.percentage}%;background:${c.cohort === 'High Performers' ? '#10b981' : c.cohort === 'Needs Support' ? '#dc2626' : '#062a8c'};"></div></div>
         </div>
       `).join("")}
     </div>

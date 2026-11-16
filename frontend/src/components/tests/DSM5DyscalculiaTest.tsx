@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { getAIPrediction } from "@/api/ai";
+import { getAIPrediction, type AssessmentPayload } from "@/api/ai";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import {
   getTestData,
   getQuestionsByGrade,
+  ITEM_BANK_VERSION,
   type TestMetrics,
   type ErrorPattern,
   type TestQuestion,
@@ -16,6 +17,9 @@ import {
 } from "@/lib/dsm5TestData";
 import { TestQuestion as TestQuestionComponent } from "./dsm5/TestQuestion";
 import { DotClusterStimulus } from "./dsm5/DotClusterStimulus";
+import { FactFluency } from "./dsm5/FactFluency";
+import { Dsm5SpecifierList, type Dsm5Specifier } from "./dsm5/Dsm5SpecifierList";
+import type { FactFluencyResult } from "@/lib/dsm5Fluency";
 import {
   Calculator,
   Play,
@@ -37,7 +41,7 @@ interface DSM5DyscalculiaTestProps {
   onComplete?: (results: any) => void;
 }
 
-type TestPhase = "intro" | "testing" | "analyzing" | "results";
+type TestPhase = "intro" | "testing" | "fluency" | "analyzing" | "results";
 
 interface SubTest {
   id: string;
@@ -189,10 +193,14 @@ export function DSM5DyscalculiaTest({
         setCurrentSubTestIndex(curSubIdx + 1);
         setCurrentQuestionIndex(0);
       } else {
-        analyzeResults();
+        // last DSM-5 specifier subtest: timed number facts ("accurate or fluent calculation")
+        setTestPhase("fluency");
       }
     }, 400);
   }, [subTests]);
+
+  const taskStartTimeRef = useRef<number>(Date.now());
+  const factsRef = useRef<FactFluencyResult | null>(null);
 
   const analyzeResults = async () => {
     setTestPhase("analyzing");
@@ -200,6 +208,8 @@ export function DSM5DyscalculiaTest({
     const currentMetrics = metricsRef.current;
     const allErrors = errorPatternsRef.current;
     const allAnswers = answeredQuestionsRef.current;
+    const taskEndTime = Date.now();
+    const elapsedSeconds = Math.max(1, (taskEndTime - taskStartTimeRef.current) / 1000);
 
     try {
       const subtestScores = Object.entries(currentMetrics).map(([id, m]) => ({
@@ -253,6 +263,41 @@ export function DSM5DyscalculiaTest({
         if (riskLevel === 'low') riskLevel = 'moderate';
       }
 
+      const facts = factsRef.current;
+      if (facts?.belowExpected) {
+        flaggedConditions.push(facts.accuracy < 0.8 ? 'Inaccurate Calculation' : 'Slow Number-Fact Retrieval');
+        riskLevel = riskLevel === 'low' ? 'moderate' : 'high';
+      }
+
+      // DSM-5 specifiers for "with impairment in mathematics"
+      const numberSense = Math.min(currentMetrics.magnitude?.accuracy ?? 100, currentMetrics.estimation?.accuracy ?? 100, currentMetrics.mapping?.accuracy ?? 100);
+      const dsm5Specifiers: Dsm5Specifier[] = [
+        {
+          name: 'Number sense',
+          status: numberSense < 70 ? 'below' : 'expected',
+          evidence: `Magnitude ${Math.round(currentMetrics.magnitude?.accuracy ?? 0)}%, estimation ${Math.round(currentMetrics.estimation?.accuracy ?? 0)}%, symbol mapping ${Math.round(currentMetrics.mapping?.accuracy ?? 0)}%`,
+        },
+        facts
+          ? {
+              name: 'Memorization of arithmetic facts',
+              status: facts.correctPerMinute < facts.expectedPerMinute * 0.6 ? 'below' : 'expected',
+              evidence: `${facts.correctPerMinute} facts correct per minute (benchmark about ${facts.expectedPerMinute}), ${(facts.avgCorrectMs / 1000).toFixed(1)} s per correct fact`,
+            }
+          : { name: 'Memorization of arithmetic facts', status: 'not_measured', evidence: 'Number facts subtest skipped' },
+        facts
+          ? {
+              name: 'Accurate or fluent calculation',
+              status: facts.accuracy < 0.8 ? 'below' : 'expected',
+              evidence: `${Math.round(facts.accuracy * 100)}% of ${facts.attempted} timed facts correct`,
+            }
+          : { name: 'Accurate or fluent calculation', status: 'not_measured', evidence: 'Number facts subtest skipped' },
+        {
+          name: 'Accurate math reasoning',
+          status: Math.min(currentMetrics.arithmetic?.accuracy ?? 100, currentMetrics.sequence?.accuracy ?? 100) < 60 ? 'below' : 'expected',
+          evidence: `Word problems ${Math.round(currentMetrics.arithmetic?.accuracy ?? 0)}%, sequences ${Math.round(currentMetrics.sequence?.accuracy ?? 0)}%`,
+        },
+      ];
+
       const analysisResult = {
         testType: 'dyscalculia',
         overallScore: Math.round(isNaN(overallAccuracy) ? 0 : overallAccuracy),
@@ -264,28 +309,73 @@ export function DSM5DyscalculiaTest({
         numberSenseScore: currentMetrics.magnitude?.accuracy || 0,
         calculationScore: currentMetrics.arithmetic?.accuracy || 0,
         answeredQuestions: allAnswers,
+        factFluency: facts,
+        dsm5Specifiers,
         summary: generateSummary(overallAccuracy, riskLevel, flaggedConditions),
         recommendations: generateRecommendations(riskLevel, flaggedConditions, errorTypeCounts),
       };
 
-      setResults(analysisResult);
-      setTestPhase("results");
-      onComplete?.(analysisResult);
+      // Sub-type metrics extraction
+      const subitizingQs = allAnswers.filter(a => a.subtest.toLowerCase().includes('estimation') || a.subtest.toLowerCase().includes('subit'));
+      const subitizingCorrect = subitizingQs.filter(a => a.correct).length;
+      const subitizingAcc = subitizingQs.length > 0 ? subitizingCorrect / subitizingQs.length : 0.8;
+      const subitizingTimes = subitizingQs.map(a => a.responseTime * 1000);
 
-      // Call AI prediction API (non-blocking)
-      const finalScore = analysisResult.overallScore;
-      const percentage = analysisResult.overallScore;
-      const answersArray = analysisResult.answeredQuestions;
-      getAIPrediction({
+      const symbolQs = allAnswers.filter(a => a.subtest.toLowerCase().includes('magnitude') || a.subtest.toLowerCase().includes('mapping'));
+      const symbolCorrect = symbolQs.filter(a => a.correct).length;
+      const symbolAcc = symbolQs.length > 0 ? symbolCorrect / symbolQs.length : 0.75;
+      const symbolTimes = symbolQs.map(a => a.responseTime * 1000);
+
+      const allResponseTimes = allAnswers.map(a => a.responseTime * 1000);
+
+      const median = (v: number[]) => { const a = [...v].sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+      const gamesPayload: Record<string, Record<string, unknown>> = {
+        arithmetic: {
+          accuracy: Number((overallAccuracy / 100).toFixed(4)),
+          response_times: allResponseTimes,
+          ...(subitizingQs.length ? { subitizing_accuracy: Number(subitizingAcc.toFixed(4)), subitizing_response_times: subitizingTimes } : {}),
+          ...(symbolQs.length ? { symbolic_comparison_accuracy: Number(symbolAcc.toFixed(4)), symbolic_comparison_times: symbolTimes,
+            comparison_rt_ms: median(symbolTimes) } : {}),
+          counting_accuracy: Number(((currentMetrics.magnitude?.accuracy ?? 0) / 100).toFixed(4)),
+          estimation_accuracy: Number(((currentMetrics.estimation?.accuracy ?? 0) / 100).toFixed(4)),
+          multi_step_accuracy: Number(((currentMetrics.arithmetic?.accuracy ?? 0) / 100).toFixed(4)),
+          procedural_accuracy: Number(((currentMetrics.sequence?.accuracy ?? 0) / 100).toFixed(4)),
+          conceptual_score: Number(((currentMetrics.arithmetic?.accuracy ?? 0) / 100).toFixed(4)),
+        },
+      };
+      if (facts) {
+        // timed number facts: retrieval speed (avg time per correct fact) and calculation accuracy
+        gamesPayload.fact_fluency = {
+          accuracy: Number(facts.accuracy.toFixed(4)),
+          avg_response_time_ms: facts.avgCorrectMs || 4000,
+          correct_per_minute: facts.correctPerMinute,
+          attempted: facts.attempted,
+          time_seconds: facts.seconds,
+        };
+      }
+
+      const aiPayload: AssessmentPayload = {
         disorder_type: "dyscalculia",
-        score: finalScore,
-        percentage: percentage,
-        answers: answersArray || []
-      }).then((aiResult) => {
-        console.log("AI RESULT:", aiResult);
-      }).catch((err) => {
-        console.error("AI prediction error:", err);
-      });
+        student_id: studentId || "guest_student",
+        grade: gradeNum,
+        item_bank: ITEM_BANK_VERSION,
+        score: analysisResult.overallScore,
+        percentage: analysisResult.overallScore,
+        games: gamesPayload,
+        timing_data: {
+          start_time: new Date(taskStartTimeRef.current).toISOString(),
+          end_time: new Date(taskEndTime).toISOString(),
+          total_duration_seconds: elapsedSeconds
+        }
+      };
+      const completed = { ...analysisResult, aiPayload };
+      setResults(completed);
+      setTestPhase("results");
+      if (onComplete) {
+        onComplete(completed);
+      } else {
+        getAIPrediction(aiPayload).catch((err) => console.error("AI prediction error:", err));
+      }
     } catch (error) {
       console.error("Analysis failed:", error);
       toast.error("Failed to analyze results. Please try again.");
@@ -351,7 +441,7 @@ export function DSM5DyscalculiaTest({
           <CardDescription>
             {studentName} • {studentGrade}
           </CardDescription>
-          <Badge variant="outline" className="mx-auto mt-2">DSM-5 Compliant • Cognitive Assessment</Badge>
+          <Badge variant="outline" className="mx-auto mt-2">Aligned with DSM-5 mathematics specifiers • Screening</Badge>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/30">
@@ -362,7 +452,7 @@ export function DSM5DyscalculiaTest({
           <div className="bg-muted/50 rounded-lg p-4">
             <h3 className="font-semibold mb-3">This assessment includes:</h3>
             <div className="space-y-2">
-              {subTests.map((st, idx) => (
+              {[...subTests, { id: 'facts', name: 'Number Facts Fluency', icon: <Calculator className="h-5 w-5" />, description: 'One minute of timed number facts' }].map((st, idx) => (
                 <div key={st.id} className="flex items-center gap-3 text-sm">
                   <span className="bg-accent text-accent-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0">
                     {idx + 1}
@@ -384,7 +474,7 @@ export function DSM5DyscalculiaTest({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center p-3 rounded-lg bg-secondary/10 border border-secondary/30">
-              <p className="text-2xl font-bold text-secondary">{subTests.length}</p>
+              <p className="text-2xl font-bold text-secondary">{subTests.length + 1}</p>
               <p className="text-xs text-muted-foreground">Subtests</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-accent/10 border border-accent/30">
@@ -462,6 +552,21 @@ export function DSM5DyscalculiaTest({
   }
 
   // Render analyzing phase
+  if (testPhase === "fluency") {
+    return (
+      <div className="space-y-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <Badge variant="outline" className="flex items-center gap-2"><Calculator className="h-4 w-4" />Number Facts Fluency</Badge>
+            <span className="text-sm text-muted-foreground">Final subtest</span>
+          </div>
+          <Progress value={100} className="h-2" />
+        </div>
+        <FactFluency grade={gradeNum} onComplete={(r) => { factsRef.current = r; analyzeResults(); }} />
+      </div>
+    );
+  }
+
   if (testPhase === "analyzing") {
     return (
       <Card className="max-w-2xl mx-auto border-2 border-accent/30">
@@ -524,6 +629,10 @@ export function DSM5DyscalculiaTest({
             ))}
           </div>
 
+          {results.dsm5Specifiers && (
+            <Dsm5SpecifierList title="DSM-5: specific learning disorder with impairment in mathematics" specifiers={results.dsm5Specifiers} />
+          )}
+
           {results.flaggedConditions?.length > 0 && (
             <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30">
               <p className="font-semibold text-destructive mb-2">Flagged Indicators:</p>
@@ -549,7 +658,7 @@ export function DSM5DyscalculiaTest({
               
               <div>
                 <p className="font-medium text-sm mb-2">Testing Criteria & DSM-5 Alignment:</p>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
                   <li>Number sense & magnitude: Comparing quantities and number values</li>
                   <li>Quantity estimation: Approximate number system (subitizing)</li>
                   <li>Arithmetic reasoning: Word problems with daily contexts</li>
@@ -560,13 +669,20 @@ export function DSM5DyscalculiaTest({
 
               {results.answeredQuestions?.length > 0 && (
                 <div>
-                  <p className="font-medium text-sm mb-2">Question-by-Question Results:</p>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <details className="group rounded-lg border bg-background/60">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium">
+                    <span>Question-by-Question Results</span>
+                    <span className="shrink-0 whitespace-nowrap text-xs font-normal text-muted-foreground">
+                      {results.answeredQuestions.filter((q: AnsweredQuestion) => q.correct).length} of {results.answeredQuestions.length} correct
+                      <span className="ml-2 inline-block transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
+                    </span>
+                  </summary>
+                  <div className="space-y-2 border-t p-3">
                     {results.answeredQuestions.map((q: AnsweredQuestion, i: number) => (
                       <div key={i} className={`p-2 rounded text-xs border ${q.correct ? 'border-success/30 bg-success/5' : 'border-destructive/30 bg-destructive/5'}`}>
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                           <Badge variant="outline" className="text-[10px]">{q.subtest}</Badge>
-                          <span className={q.correct ? 'text-success' : 'text-destructive'}>
+                          <span className={`shrink-0 ${q.correct ? 'text-success' : 'text-destructive'}`}>
                             {q.correct ? '✓ Correct' : '✗ Incorrect'} ({q.responseTime.toFixed(1)}s)
                           </span>
                         </div>
@@ -575,20 +691,17 @@ export function DSM5DyscalculiaTest({
                       </div>
                     ))}
                   </div>
+                  </details>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-muted/30">
-            <p className="font-semibold mb-2">Summary:</p>
-            <p className="text-sm text-muted-foreground">{results.summary}</p>
-          </div>
 
           {results.recommendations?.length > 0 && (
             <div className="p-4 rounded-lg bg-accent/10 border border-accent/30">
               <p className="font-semibold mb-2">Recommendations:</p>
-              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
                 {results.recommendations.map((r: string, i: number) => (
                   <li key={i}>{r}</li>
                 ))}

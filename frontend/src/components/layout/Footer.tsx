@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
-import logolight from "@/assets/logolight.png";
-import logodark from "@/assets/logodark.png";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Facebook, Twitter, Linkedin, Instagram, Youtube, Mail } from "lucide-react";
 
 const footerLinks = {
@@ -45,19 +44,7 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-6">
           {/* Brand */}
            <div className="lg:col-span-2">
-           {/* Light mode logo */}
-          <img
-             src={logolight}
-             alt="SWARSETU Logo"
-             className="h-16 w-auto block dark:hidden"
-          />
-
-          {/* Dark mode logo */}
-         <img
-             src={logodark}
-             alt="SWARSETU Logo Dark"
-             className="h-16 w-auto hidden dark:block"
-          />
+           <BrandLogo size="lg" showTagline />
             <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-xs">
               AI-powered early detection of learning disabilities for every Indian child. 
               Multilingual, voice-first, and accessible.

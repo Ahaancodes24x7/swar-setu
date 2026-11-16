@@ -27,7 +27,7 @@ export interface StudentProgressModalProps {
   teacherId: string;
 }
 
-type TestSessionRow = Tables<"test_sessions">["Row"];
+type TestSessionRow = Tables<"test_sessions">;
 
 interface ChartDataPoint {
   date: string;

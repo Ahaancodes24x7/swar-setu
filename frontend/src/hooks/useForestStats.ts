@@ -7,6 +7,7 @@ type TestSession = Tables<"test_sessions">;
 interface StudentWithStats extends Student {
   testCount: number;
   averageScore: number;
+  lastSessionAt: string | null;
 }
 
 interface ForestStats {
@@ -34,10 +35,16 @@ export function useForestStats(
         ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
         : 0;
       
+      const lastSessionAt = completedSessions.reduce<string | null>(
+        (latest, s) => (!latest || s.created_at > latest ? s.created_at : latest),
+        null
+      );
+
       return {
         ...student,
         testCount: completedSessions.length,
-        averageScore
+        averageScore,
+        lastSessionAt
       };
     });
     

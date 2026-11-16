@@ -21,6 +21,7 @@ import { useBadges } from "@/hooks/useBadges";
 import { DEFAULT_SLD_RESOURCES, type LearningResource } from "@/hooks/useLearningResources";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { checkParentAccess, type AccessTier } from "@/api/access";
 import {
   Trophy,
   Star,
@@ -43,6 +44,8 @@ import {
   Brain,
   Pencil,
   ArrowRight,
+  Lock,
+  Crown,
 } from "lucide-react";
 
 type Student = Tables<"students">;
@@ -73,6 +76,8 @@ export default function ParentDashboard() {
   const [selectedReportSession, setSelectedReportSession] = useState<TestSession | null>(null);
   const [selectedResource, setSelectedResource] = useState<LearningResource | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  // null until checked; "unknown" when the backend can't be reached
+  const [accessTier, setAccessTier] = useState<AccessTier | "unknown" | null>(null);
 
   // Use dynamic badges
   const { badges, loading: badgesLoading, checkAndAwardBadges } = useBadges(student?.id);
@@ -82,17 +87,30 @@ export default function ParentDashboard() {
     if (!user) return;
     
     let activeStudent: Student | null = null;
+    const userEmailClean = user.email ? user.email.toLowerCase().trim() : "";
 
-    // Find the student linked to this parent in Supabase
-    const { data: studentData } = await supabase
-      .from("students")
-      .select("*")
-      .or(`parent_email.eq.${user.email},parent_id.eq.${user.id}`)
-      .maybeSingle();
+    // Find student linked to this parent in Supabase (ilike email or parent_id)
+    try {
+      const { data: studentList } = await supabase
+        .from("students")
+        .select("*")
+        .or(`parent_id.eq.${user.id},parent_email.ilike.${userEmailClean}`);
 
-    if (studentData) {
-      activeStudent = studentData as Student;
-    } else {
+      if (studentList && studentList.length > 0) {
+        activeStudent = studentList[0] as Student;
+        // Auto-link parent_id in Supabase if missing
+        if (!activeStudent.parent_id) {
+          await supabase
+            .from("students")
+            .update({ parent_id: user.id })
+            .eq("id", activeStudent.id);
+        }
+      }
+    } catch (e) {
+      console.warn("Supabase student fetch warning:", e);
+    }
+
+    if (!activeStudent) {
       // Local storage fallback for offline / demo students
       try {
         const localData = localStorage.getItem("swar_setu_local_students_v1");
@@ -100,7 +118,7 @@ export default function ParentDashboard() {
           const parsed: Student[] = JSON.parse(localData);
           const userEmailLower = user.email.toLowerCase().trim();
           const match = parsed.find(
-            (s) => s.parent_email && s.parent_email.toLowerCase().trim() === userEmailLower
+            (s) => (s.parent_email && s.parent_email.toLowerCase().trim() === userEmailLower) || s.parent_id === user.id
           );
           if (match) {
             activeStudent = match;
@@ -113,6 +131,25 @@ export default function ParentDashboard() {
 
     if (activeStudent) {
       setStudent(activeStudent);
+
+      // Parent access is a premium feature, granted per child from the admin panel
+      let tier: AccessTier | "unknown";
+      try {
+        tier = await checkParentAccess({
+          student_id: activeStudent.id,
+          name: activeStudent.name,
+          grade: activeStudent.grade,
+          parent_email: activeStudent.parent_email,
+        });
+      } catch (e) {
+        console.warn("Parent access check failed:", e);
+        tier = "unknown";
+      }
+      setAccessTier(tier);
+      if (tier !== "premium") {
+        setLoading(false);
+        return;
+      }
       
       // Fetch test sessions for this student from Supabase
       const { data: sessionsData } = await supabase
@@ -230,6 +267,37 @@ export default function ParentDashboard() {
     );
   }
 
+  if (student && accessTier !== "premium") {
+    const unknown = accessTier === "unknown";
+    return (
+      <Layout hideFooter hideHeader={true}>
+        <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-accent/5 to-background">
+          <Card className="w-full max-w-md text-center">
+            <CardHeader>
+              <div className="mx-auto mb-2 h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+                {unknown ? <Lock className="h-7 w-7 text-primary" /> : <Crown className="h-7 w-7 text-primary" />}
+              </div>
+              <CardTitle>{unknown ? "Couldn't check access" : `${student.name}'s reports are a Premium feature`}</CardTitle>
+              <CardDescription>
+                {unknown
+                  ? "We couldn't reach the server to confirm parent access. Please try again in a moment."
+                  : "Parent access to progress reports, badges and AI insights is available on Premium. Please contact your school to upgrade."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center gap-2">
+              <Button variant="outline" onClick={() => { setLoading(true); fetchStudentData(); }}>
+                Check again
+              </Button>
+              <Button variant="ghost" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-1" /> Log out
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout hideFooter hideHeader={true}>
       <div className="min-h-screen bg-gradient-to-b from-accent/5 to-background">
@@ -237,7 +305,7 @@ export default function ParentDashboard() {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">{t.welcome} 👋</h1>
+              <h1 className="text-2xl md:text-3xl font-bold" data-tour="parent-welcome">{t.welcome} 👋</h1>
               <p className="text-muted-foreground">
                 {student ? `${t.hereIsProgress.replace("your child", student.name)}` : t.hereIsProgress}
               </p>
@@ -247,18 +315,18 @@ export default function ParentDashboard() {
                 <Flame className="h-5 w-5 text-accent" />
                 <span className="font-semibold">{student?.streak_days || 0} {t.dayStreak}</span>
               </div>
-              <Button variant="hero" size="sm" onClick={() => setChatOpen(!chatOpen)}>
+              <Button variant="hero" size="sm" onClick={() => setChatOpen(!chatOpen)} data-tour="saathi">
                 <Sparkles className="h-4 w-4 mr-2" />
                 Saathi
               </Button>
-              <Button variant="outline" size="icon" onClick={handleLogout} title={t.logout}>
+              <Button variant="outline" size="icon" onClick={handleLogout} title={t.logout} data-tour="parent-logout">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" data-tour="parent-summary">
             <Card className="border-accent/30">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
@@ -360,7 +428,7 @@ export default function ParentDashboard() {
                       );
                     }
 
-                    const report = currentSession.analysis_report as { summary?: string; recommendations?: string[] } | null;
+                    const report = currentSession.analysis_report as { summary?: string; recommendations?: string[]; riskLevel?: string } | null;
                     const rawSummary = report?.summary || "";
                     const cleanSummary = rawSummary
                       ? rawSummary.replace(/\(\d+%\s*accuracy\)/gi, "").replace(/\s+/g, " ").trim()
@@ -370,6 +438,9 @@ export default function ParentDashboard() {
                       <>
                         <div className="flex items-center justify-between text-xs text-muted-foreground bg-background/60 px-3 py-1.5 rounded-md">
                           <span className="font-semibold text-foreground capitalize">{currentSession.test_type} Screening Test</span>
+                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium text-[11px]">
+                            {report?.riskLevel === 'high' ? 'Professional evaluation recommended' : report?.riskLevel === 'moderate' ? 'Some areas to watch' : 'No concerns identified'}
+                          </span>
                           <span>Completed on {new Date(currentSession.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
                         </div>
 
@@ -391,6 +462,10 @@ export default function ParentDashboard() {
                             </ul>
                           </div>
                         )}
+
+                        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-2.5 rounded-md text-[11px]">
+                          🛡️ <strong>Note for Parents:</strong> This is an AI screening tool designed to help teachers and parents identify learning patterns early. It is not a clinical medical diagnosis.
+                        </div>
 
                         <div className="flex justify-end pt-1">
                           <Button
@@ -554,9 +629,10 @@ export default function ParentDashboard() {
                   <div className="space-y-2">
                     {DEFAULT_SLD_RESOURCES.slice(0, 3).map((resource) => (
                       <div
+                        role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedResource(resource); } }}
                         key={resource.id}
                         onClick={() => setSelectedResource(resource)}
-                        className="p-3 rounded-lg border border-border bg-card hover:bg-muted/50 cursor-pointer transition-all space-y-1"
+                        className="card-pop p-3 rounded-lg border border-border bg-card hover:bg-muted/50 cursor-pointer transition-all space-y-1"
                       >
                         <div className="flex items-center justify-between">
                           <Badge variant="secondary" className="text-[10px] capitalize">

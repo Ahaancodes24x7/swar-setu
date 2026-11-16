@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -23,22 +23,35 @@ import { DysgraphiaCanvas } from "@/components/tests/DysgraphiaCanvas";
 import { PerceptionTest } from "@/components/tests/PerceptionTest";
 import { ForestScene } from "@/components/forest/ForestScene";
 import { ForestViewToggle } from "@/components/forest/ForestViewToggle";
-import { TeacherActivityIndicators } from "@/components/forest/TeacherActivityIndicators";
+import { BrandLogo } from "@/components/brand/BrandLogo";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { LeafIcon, STAGE_LABELS, getTreeStage, type TreeStage } from "@/components/forest/StudentTree";
 import type { Tables } from "@/integrations/supabase/types";
 import { 
   Users, Plus, Trash2, Mic, FileText, AlertTriangle, CheckCircle, Mail, 
   Search, Download, Loader2, LogOut, BookOpen, Calculator, Pencil, 
-  ArrowLeft, TrendingUp, X, Eye, Brain, ArrowUpDown, Check, HelpCircle
+  ArrowLeft, TrendingUp, X, Eye, Brain, ArrowUpDown, Check, HelpCircle, ClipboardList, Lock, ListChecks,
+  Bell, Sprout, CalendarDays, BarChart3, Link2, ArrowRight
 } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuRadioGroup, 
   DropdownMenuRadioItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { TestReportDialog } from "@/components/dashboard/TestReportDialog";
+import { AIResultPanel } from "@/components/dashboard/AIResultPanel";
+import { StudentProfileDialog } from "@/components/profile/StudentProfileDialog";
+import { AIPredictionResult, AssessmentPayload, getAIPrediction, getUnifiedProfile } from "@/api/ai";
 import { StudentProgressModal } from "@/components/dashboard/StudentProgressModal";
+import { SingleTestPermissionDialog } from "@/components/dashboard/SingleTestPermissionDialog";
+import {
+  BATTERY, DisorderTest, ScreeningMode, TEST_LABELS, buildUnifiedRequest, newBatteryId, protocolFor,
+} from "@/lib/screeningBattery";
 
 type TestSession = Tables<"test_sessions">;
 type Student = Tables<"students">;
@@ -51,6 +64,24 @@ type TestType = null | "dyslexia" | "dyscalculia" | "dysgraphia" | "perception";
 type ViewMode = "forest" | "classic";
 type SortOption = "name" | "grade" | "status";
 
+// One screening session: the full DSM-5 battery (all three tests) or a teacher-permitted single test
+interface ScreeningRun {
+  mode: ScreeningMode;
+  batteryId: string;
+  tests: DisorderTest[];
+  step: number; // index into tests of the test being taken
+  reason?: string;
+  payloads: Partial<Record<DisorderTest, AssessmentPayload>>;
+}
+type RunStage = "test" | "between" | "scoring" | "done";
+
+const NAV = [
+  { value: "students", label: "Learning Forest", icon: Sprout },
+  { value: "tests", label: "Assessments", icon: ClipboardList },
+  { value: "reports", label: "Reports", icon: BarChart3 },
+  { value: "resources", label: "Resources", icon: BookOpen },
+] as const;
+
 export default function TeacherDashboard() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -59,70 +90,66 @@ export default function TeacherDashboard() {
   const [sortOption, setSortOption] = useState<SortOption>("name");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newStudent, setNewStudent] = useState({ name: "", grade: "", parentEmail: "" });
+  // student whose DSM-5 profile/questionnaire dialog is open (opens right after a student is added)
+  const [profileStudent, setProfileStudent] = useState<{ id: string; name: string; grade: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [testSessions, setTestSessions] = useState<SessionWithStudent[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("forest");
+  const [tab, setTab] = useState("students");
+  const [stageFilter, setStageFilter] = useState<TreeStage[] | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [parentsOpen, setParentsOpen] = useState(false);
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<Student | null>(null);
   const [reportSession, setReportSession] = useState<SessionWithStudent | null>(null);
   const [progressModalStudent, setProgressModalStudent] = useState<Student | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editParentEmail, setEditParentEmail] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   
   // Test selection state
   const [selectedTest, setSelectedTest] = useState<TestType>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  
-  const { students, loading, addStudent, deleteStudent } = useStudents();
+  const [lastAIResult, setLastAIResult] = useState<AIPredictionResult | null>(null);
+  const [run, setRun] = useState<ScreeningRun | null>(null);
+  const [runStage, setRunStage] = useState<RunStage>("test");
+  const [permissionRequest, setPermissionRequest] = useState<{ test: DisorderTest; student: Student } | null>(null);
+
+  const { students, loading, addStudent, updateStudent, deleteStudent } = useStudents();
   const forestStats = useForestStats(students, testSessions);
 
-  const SESSIONS_STORAGE_KEY = "swar_setu_local_sessions_v1";
-
-  const getLocalSessions = (): TestSession[] => {
-    try {
-      const data = localStorage.getItem(SESSIONS_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
+  const handleOpenEdit = (studentToEdit: Student) => {
+    setEditingStudent(studentToEdit);
+    setEditParentEmail(studentToEdit.parent_email || "");
   };
 
-  const saveLocalSessions = (sessions: TestSession[]) => {
-    try {
-      localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
-    } catch (e) {
-      console.warn("Could not save sessions to localStorage:", e);
-    }
+  const handleSaveEdit = async () => {
+    if (!editingStudent) return;
+    setIsSavingEdit(true);
+    await updateStudent(editingStudent.id, { parentEmail: editParentEmail });
+    setEditingStudent(null);
+    setIsSavingEdit(false);
   };
 
   // Fetch test sessions
   useEffect(() => {
     const fetchSessions = async () => {
-      const localSessions = getLocalSessions();
-      let mergedSessions = [...localSessions];
-
-      if (user) {
-        const { data, error } = await supabase
-          .from("test_sessions")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(100);
-
-        if (!error && data && data.length > 0) {
-          data.forEach((remote) => {
-            if (!mergedSessions.some((s) => s.id === remote.id)) {
-              mergedSessions.push(remote as TestSession);
-            }
-          });
-        }
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from("test_sessions")
+        .select("*")
+        .eq("conducted_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      
+      if (!error && data) {
+        const enrichedSessions = data.map(session => {
+          const student = students.find(s => s.id === session.student_id);
+          return { ...session, student };
+        });
+        setTestSessions(enrichedSessions);
       }
-
-      saveLocalSessions(mergedSessions);
-
-      const enrichedSessions = mergedSessions.map((session) => {
-        const student = students.find((s) => s.id === session.student_id);
-        return { ...session, student };
-      });
-
-      setTestSessions(enrichedSessions);
       setLoadingSessions(false);
     };
 
@@ -192,10 +219,12 @@ export default function TeacherDashboard() {
   const handleAddStudent = async () => {
     if (!newStudent.name || !newStudent.grade) return;
     setIsAdding(true);
-    await addStudent(newStudent);
+    const created = await addStudent(newStudent);
     setNewStudent({ name: "", grade: "", parentEmail: "" });
     setDialogOpen(false);
     setIsAdding(false);
+    // next step after the grade: the teacher/operator fills in the student profile and DSM-5 questionnaire
+    if (created) setProfileStudent({ id: created.id, name: created.name, grade: created.grade });
   };
 
   const handleDeleteStudent = async (id: string) => {
@@ -204,19 +233,112 @@ export default function TeacherDashboard() {
     }
   };
 
-  const startTest = (testType: TestType, student: Student) => {
+  const launch = (testType: TestType, student: Student, newRun: ScreeningRun | null) => {
+    setRun(newRun);
+    setRunStage("test");
     setSelectedTest(testType);
     setSelectedStudent(student);
     setSelectedStudentForDetail(null);
+    setLastAIResult(null);
+  };
+
+  // Default: all three DSM-5 tests, scored together by the comprehensive model
+  const startFullScreening = (student: Student) =>
+    launch(BATTERY[0], student, { mode: "full", batteryId: newBatteryId(), tests: [...BATTERY], step: 0, payloads: {} });
+
+  // A single DSM-5 test needs the teacher's explicit permission (see SingleTestPermissionDialog)
+  const requestSingleTest = (test: DisorderTest, student: Student) => setPermissionRequest({ test, student });
+
+  const startPermittedSingleTest = (reason: string) => {
+    if (!permissionRequest) return;
+    const { test, student } = permissionRequest;
+    setPermissionRequest(null);
+    launch(test, student, { mode: "single", batteryId: newBatteryId(), tests: [test], step: 0, reason, payloads: {} });
+  };
+
+  // Perception is a supplementary task, not one of the three DSM-5 tests
+  const startPerception = (student: Student) => launch("perception", student, null);
+
+  const exitTest = () => {
+    if (run?.mode === "full" && runStage !== "done") {
+      const done = run.step + (runStage === "between" ? 1 : 0);
+      if (!confirm(`The DSM-5 screening is incomplete (${done} of ${BATTERY.length} tests done). Completed tests are saved, ` +
+                   "but no combined screening result will be produced. Leave anyway?")) return;
+    }
+    setSelectedTest(null);
+    setSelectedStudent(null);
+    setRun(null);
+    setLastAIResult(null);
+  };
+
+  const continueBattery = () => {
+    if (!run) return;
+    const step = run.step + 1;
+    setRun({ ...run, step });
+    setSelectedTest(run.tests[step]);
+    setRunStage("test");
   };
 
   const handleStudentClick = (student: Student) => {
     setSelectedStudentForDetail(student);
   };
 
+  const refreshSessions = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("test_sessions")
+      .select("*")
+      .eq("conducted_by", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (data) {
+      setTestSessions(data.map(session => ({ ...session, student: students.find(s => s.id === session.student_id) })));
+    }
+  };
+
   const handleTestComplete = async (results: any) => {
+    const isDsm5Test = run && results?.testType && results.testType !== "perception";
+    if (isDsm5Test && user && selectedStudent) {
+      await saveSession(results);
+      const test = run.tests[run.step];
+      const payloads = results.aiPayload ? { ...run.payloads, [test]: results.aiPayload } : run.payloads;
+      setRun({ ...run, payloads });
+
+      if (run.mode === "full" && run.step < run.tests.length - 1) {
+        setRunStage("between");
+      } else if (run.mode === "full") {
+        // all three tests done: one comprehensive DSM-5 screen on the full 64-feature profile
+        setRunStage("scoring");
+        let unified: AIPredictionResult | null = null;
+        try {
+          unified = await getUnifiedProfile(buildUnifiedRequest(payloads, selectedStudent.id));
+        } catch (e) {
+          console.error("Comprehensive screening failed:", e);
+        }
+        if (!unified) toast.error("Could not compute the combined screening result. The three tests are saved.");
+        setLastAIResult(unified);
+        setRunStage("done");
+      } else {
+        // teacher-permitted single test: the single-test model for that domain
+        if (results.aiPayload) {
+          setLastAIResult(await getAIPrediction({ ...results.aiPayload, student_id: selectedStudent.id }));
+        }
+        setRunStage("done");
+      }
+      await refreshSessions();
+      return;
+    }
+
+    // supplementary perception task: nothing to score, return to the dashboard
+    await refreshSessions();
+    setSelectedTest(null);
+    setSelectedStudent(null);
+    setRun(null);
+  };
+
+  const saveSession = async (results: any) => {
     try {
-      if (selectedStudent && results?.testType && results.testType !== "perception") {
+      if (user && selectedStudent && run) {
         const summary =
           typeof results.summary === "string" && results.summary.trim()
             ? results.summary
@@ -238,80 +360,107 @@ export default function TeacherDashboard() {
           flaggedConditions: results.flaggedConditions || [],
           errorPatterns: results.errorTypeCounts || {},
           answeredQuestions: results.answeredQuestions || [],
+          // full three-test DSM-5 screening, or a single test with the teacher's recorded permission
+          screening_protocol: protocolFor(run.mode, run.batteryId, run.step + 1, user.id, run.reason),
         };
 
-        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-        const newSessionRecord: TestSession = {
-          id: newSessionId,
+        const { error: insertError } = await supabase.from("test_sessions").insert({
           student_id: selectedStudent.id,
-          conducted_by: user?.id || "local_teacher",
+          conducted_by: user.id,
           test_type: String(results.testType),
           status: "completed",
-          created_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           overall_score: overallScore,
-          reading_score: results.pronunciationConsistency || results.domainScores?.motorControl || null,
-          number_score: results.numberSenseScore || results.calculationScore || results.domainScores?.writingFluency || null,
+          reading_score: results.pronunciationConsistency || null,
+          number_score: results.numberSenseScore || results.calculationScore || null,
           phoneme_score: results.phonemeErrorRate != null ? (100 - results.phonemeErrorRate) : null,
           flagged_conditions: Array.isArray(results.flaggedConditions) ? results.flaggedConditions : null,
           analysis_report: analysisReport,
-        };
-
-        // Instantly update state and persist locally so reports & dashboard render 100% reliably
-        setTestSessions((prev) => {
-          const updated = [
-            { ...newSessionRecord, student: selectedStudent },
-            ...prev.filter((s) => s.id !== newSessionRecord.id),
-          ];
-          saveLocalSessions(updated);
-          return updated;
         });
 
-        toast.success(`${results.testType.toUpperCase()} assessment saved successfully!`);
-
-        // Remote backup into Supabase (non-blocking)
-        if (user) {
-          supabase.from("test_sessions").insert({
-            student_id: selectedStudent.id,
-            conducted_by: user.id,
-            test_type: String(results.testType),
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            overall_score: overallScore,
-            reading_score: newSessionRecord.reading_score,
-            number_score: newSessionRecord.number_score,
-            phoneme_score: newSessionRecord.phoneme_score,
-            flagged_conditions: newSessionRecord.flagged_conditions,
-            analysis_report: analysisReport,
-          }).then(({ error }) => {
-            if (error) console.warn("Supabase session sync notice:", error.message);
-          });
+        if (insertError) {
+          console.error("DB insert error:", insertError);
+          toast.error("Failed to save test session");
+        } else {
+          toast.success("Test results saved successfully!");
         }
       }
     } catch (e) {
       console.error("Failed to persist test session:", e);
       toast.error("Failed to save test results");
     }
-
-    setSelectedTest(null);
-    setSelectedStudent(null);
   };
 
-  // If a test is in progress, show the test component
   if (selectedTest && selectedStudent) {
+    const nextTest = run && run.step + 1 < run.tests.length ? run.tests[run.step + 1] : null;
+    const testsDone = run ? run.step + (runStage === "test" ? 0 : 1) : 0;
     return (
       <Layout hideFooter hideHeader={true}>
         <div className="min-h-screen bg-muted/20 py-8">
           <div className="container mx-auto px-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="mb-6"
-              onClick={() => { setSelectedTest(null); setSelectedStudent(null); }}
+              onClick={exitTest}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               {t.back}
             </Button>
-            
+
+            {run?.mode === "full" && (
+              <Card className="mx-auto mb-6 w-full max-w-2xl">
+                <CardContent className="pt-6 space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold flex items-center gap-2">
+                      <ListChecks className="h-4 w-4" /> DSM-5 screening for {selectedStudent.name}
+                    </span>
+                    <span className="text-muted-foreground">{testsDone} of {run.tests.length} tests done</span>
+                  </div>
+                  <Progress value={(testsDone / run.tests.length) * 100} />
+                  <div className="flex flex-wrap gap-2">
+                    {run.tests.map((test, i) => (
+                      <Badge key={test} variant={i < testsDone ? "default" : i === run.step ? "secondary" : "outline"}>
+                        {i < testsDone ? "✓ " : ""}{TEST_LABELS[test]}
+                      </Badge>
+                    ))}
+                  </div>
+                  {runStage === "between" && nextTest && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md bg-muted p-3">
+                      <p className="text-sm">
+                        {TEST_LABELS[run.tests[run.step]]} complete. Give the child a short break if needed, then continue
+                        with the {TEST_LABELS[nextTest].toLowerCase()}.
+                      </p>
+                      <Button onClick={continueBattery}>Start {TEST_LABELS[nextTest]}</Button>
+                    </div>
+                  )}
+                  {runStage === "scoring" && (
+                    <p className="text-sm flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Combining all three tests into one DSM-5 screening result…
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            {run?.mode === "single" && (
+              <Card className="mx-auto mb-6 w-full max-w-2xl border-dashed">
+                <CardContent className="pt-6 text-sm flex items-start gap-2">
+                  <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>
+                    Single test permitted by the teacher ({run.reason}). It screens one domain only; run the full DSM-5
+                    screening for a combined result across reading, math and writing.
+                  </span>
+                </CardContent>
+              </Card>
+            )}
+            {runStage === "done" && (
+              <div className="mx-auto mb-6 w-full max-w-2xl space-y-4">
+                {lastAIResult && <AIResultPanel result={lastAIResult} />}
+                <div className="flex justify-end">
+                  <Button onClick={exitTest}>Back to dashboard</Button>
+                </div>
+              </div>
+            )}
+
             {selectedTest === "dyslexia" && (
               <DSM5DyslexiaTest
                 studentName={selectedStudent.name}
@@ -350,199 +499,215 @@ export default function TeacherDashboard() {
     );
   }
 
+  const awaitingFirst = forestStats.studentsWithStats.filter((s) => s.testCount === 0).length;
+  const parentsConnected = students.filter((s) => s.parent_email).length;
+  const teacherName: string = user?.user_metadata?.full_name || user?.email || "Teacher";
+  const recentSessions = testSessions.slice(0, 6);
+  const goTab = (value: string) => {
+    setTab(value);
+    if (value === "students") setViewMode("forest");
+  };
+
   return (
     <Layout hideFooter hideHeader={true}>
-      <div className="min-h-screen bg-muted/20">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-                🌳 Learning Forest
-              </h1>
-              <p className="text-muted-foreground">{t.conductTests}</p>
+      <div className="min-h-screen bg-[hsl(42_55%_95%)] dark:bg-background">
+        {/* ===== top bar ===== */}
+        <header className="sticky top-0 z-40 border-b border-[hsl(40_30%_86%)] bg-[hsl(42_55%_95%/0.92)] backdrop-blur dark:border-border dark:bg-background/90">
+          <div className="container mx-auto flex h-16 items-center gap-3 px-4">
+            <Link to="/" className="shrink-0" aria-label="Swar-Setu home">
+              <BrandLogo size="sm" />
+            </Link>
+            <span className="mx-2 hidden h-7 w-px bg-border lg:block" />
+            <nav className="hidden items-center gap-1 lg:flex" data-tour="teacher-tabs">
+              {NAV.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => (value === "resources" ? navigate("/dashboard/teacher/resources") : goTab(value))}
+                  data-tour={value === "resources" ? "teacher-resources" : undefined}
+                  className={`group flex items-center gap-2 rounded-xl px-4 py-2 text-[15px] font-semibold transition ${
+                    tab === value ? "bg-leaf/20 text-forest dark:text-leaf" : "text-foreground/80 hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 transition-transform group-hover:-rotate-6 group-hover:scale-110" />
+                  {label}
+                </button>
+              ))}
+            </nav>
+            <div className="ml-auto flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={() => navigate("/dashboard/teacher/help")} aria-label="Help" data-tour="teacher-help">
+                <HelpCircle className="h-5 w-5" />
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative rounded-full" aria-label="Recent sessions">
+                    <Bell className="h-5 w-5" />
+                    {testsThisWeek > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 animate-pulse rounded-full bg-[hsl(14_90%_56%)] ring-2 ring-[hsl(42_55%_95%)]" />}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80 rounded-2xl p-2">
+                  <p className="px-2 py-1.5 text-sm font-semibold">Recent sessions</p>
+                  {recentSessions.length === 0 ? (
+                    <p className="px-2 pb-2 text-sm text-muted-foreground">No sessions yet. Start one from the forest.</p>
+                  ) : (
+                    recentSessions.map((s) => (
+                      <button key={s.id} type="button" onClick={() => setReportSession(s)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-muted">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-leaf/20 text-forest dark:text-leaf">
+                          <Sprout className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{s.student?.name ?? "Learner"}</span>
+                          <span className="block truncate text-xs capitalize text-muted-foreground">{s.test_type} · {new Date(s.created_at).toLocaleDateString()}</span>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </PopoverContent>
+              </Popover>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="ml-1 grid h-10 w-10 place-items-center rounded-full bg-forest text-base font-bold text-forest-foreground shadow-sm transition hover:scale-105 active:scale-95" aria-label="Account">
+                    {teacherName.charAt(0).toUpperCase()}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="truncate">{teacherName}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/dashboard/teacher/help")}><HelpCircle className="mr-2 h-4 w-4" />Help &amp; guides</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/dashboard/teacher/resources")}><BookOpen className="mr-2 h-4 w-4" />Resources</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive"><LogOut className="mr-2 h-4 w-4" />{t.logout}</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                className="rounded-full border-primary/30 text-primary hover:bg-primary/10 hover:text-primary hover:shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
-                onClick={() => navigate("/dashboard/teacher/help")}
+          </div>
+          {/* phone / tablet nav */}
+          <nav className="container mx-auto flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
+            {NAV.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => (value === "resources" ? navigate("/dashboard/teacher/resources") : goTab(value))}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                  tab === value ? "bg-forest text-forest-foreground" : "bg-white/70 text-foreground/80 dark:bg-white/5"
+                }`}
               >
-                <HelpCircle className="h-4 w-4 mr-2" />
-                Need Help?
-              </Button>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="hero"><Plus className="h-4 w-4 mr-2" />Plant a Tree</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>🌱 Plant a New Tree (Add Student)</DialogTitle>
-                    <DialogDescription>Enter student details to add them to your forest.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <div className="space-y-2">
-                      <Label>{t.studentName}</Label>
-                      <Input value={newStudent.name} onChange={(e) => setNewStudent(p => ({ ...p, name: e.target.value }))} placeholder="Full name" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t.grade}</Label>
-                      <Input value={newStudent.grade} onChange={(e) => setNewStudent(p => ({ ...p, grade: e.target.value }))} placeholder="e.g., 3" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t.parentEmail} (Optional)</Label>
-                      <Input value={newStudent.parentEmail} onChange={(e) => setNewStudent(p => ({ ...p, parentEmail: e.target.value }))} type="email" placeholder="parent@email.com" />
-                    </div>
-                    <Button className="w-full" onClick={handleAddStudent} disabled={isAdding || !newStudent.name || !newStudent.grade}>
-                      {isAdding ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t.loading}</> : "🌱 Plant Tree"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button variant="outline" size="icon" onClick={handleLogout} title={t.logout}>
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </header>
 
-          {/* Teacher Activity Indicators (Weather) */}
-          <TeacherActivityIndicators
-            sunlight={forestStats.sunlight}
-            water={forestStats.water}
-            parentInteraction={forestStats.parentInteraction}
-            className="mb-6"
-          />
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-success/20 flex items-center justify-center text-xl">
-                    🌳
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{students.length}</p>
-                    <p className="text-xs text-muted-foreground">Trees in Forest</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-destructive/20 flex items-center justify-center text-xl">
-                    🍂
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{students.filter(s => s.status === "flagged").length}</p>
-                    <p className="text-xs text-muted-foreground">Need Care</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-xl">
-                    ☀️
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{testsThisWeek}</p>
-                    <p className="text-xs text-muted-foreground">Tests This Week</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-info/20 flex items-center justify-center text-xl">
-                    👨‍👩‍👧
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{students.filter(s => s.parent_email).length}</p>
-                    <p className="text-xs text-muted-foreground">{t.linkedParents}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Tabs defaultValue="students" className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <TabsList>
-                <TabsTrigger value="students">{t.students}</TabsTrigger>
-                <TabsTrigger value="tests">{t.conductTests}</TabsTrigger>
-                <TabsTrigger value="reports">{t.reports}</TabsTrigger>
-              </TabsList>
-              <div className="flex items-center gap-3">
-                <ForestViewToggle view={viewMode} onViewChange={setViewMode} />
-                <Button variant="outline" onClick={() => navigate("/dashboard/teacher/resources")}>
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Resources
-                </Button>
+        <div className="container mx-auto px-4 pb-12 pt-6">
+          {/* ===== title ===== */}
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Sprout className="h-12 w-12 shrink-0 text-leaf sm:h-14 sm:w-14" strokeWidth={2.4} />
+              <div>
+                <h1 className="flex flex-wrap items-center gap-3 text-3xl font-extrabold tracking-tight text-forest sm:text-4xl dark:text-leaf" data-tour="teacher-title">
+                  Your learning forest
+                  <span className="rounded-full bg-leaf/20 px-3 py-1 text-xs font-semibold tracking-normal text-forest dark:text-leaf">
+                    {students.length} {students.length === 1 ? "tree" : "trees"} growing
+                  </span>
+                </h1>
+                <p className="mt-1 text-base text-muted-foreground">Every learner has a place to grow.</p>
               </div>
             </div>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg" className="group h-12 rounded-2xl bg-forest px-6 text-base font-bold text-forest-foreground shadow-[0_5px_0_hsl(152_64%_10%)] hover:bg-forest hover:brightness-110 active:translate-y-1 active:shadow-[0_1px_0_hsl(152_64%_10%)]" data-tour="add-student">
+                  <Plus className="mr-1 h-5 w-5 transition-transform group-hover:rotate-90" />Add student
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2"><Sprout className="h-5 w-5 text-leaf" /> Plant a new seed</DialogTitle>
+                  <DialogDescription>Add a learner to your forest. You will fill in their profile next.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>{t.studentName}</Label>
+                    <Input value={newStudent.name} onChange={(e) => setNewStudent(p => ({ ...p, name: e.target.value }))} placeholder="Full name" autoFocus />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t.grade}</Label>
+                    <Input value={newStudent.grade} onChange={(e) => setNewStudent(p => ({ ...p, grade: e.target.value }))} placeholder="e.g., 3" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t.parentEmail} (Optional)</Label>
+                    <Input value={newStudent.parentEmail} onChange={(e) => setNewStudent(p => ({ ...p, parentEmail: e.target.value }))} type="email" placeholder="parent@email.com" />
+                  </div>
+                  <Button className="w-full bg-forest text-forest-foreground hover:bg-forest hover:brightness-110" onClick={handleAddStudent} disabled={isAdding || !newStudent.name || !newStudent.grade}>
+                    {isAdding ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t.loading}</> : "Plant & continue to profile"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* ===== stats strip ===== */}
+          <div className="mb-6 grid grid-cols-2 gap-2 rounded-3xl border border-[hsl(40_30%_84%)] bg-[hsl(42_60%_97%)] p-2 shadow-sm lg:grid-cols-4 dark:border-border dark:bg-card" data-tour="teacher-stats">
+            {([
+              { icon: Users, tone: "text-forest dark:text-leaf", value: students.length, label: students.length === 1 ? "learner" : "learners", onClick: () => { setStageFilter(null); goTab("students"); }, active: false },
+              { icon: Sprout, tone: "text-leaf", value: awaitingFirst, label: "awaiting first assessment", onClick: () => { setStageFilter(["seed"]); goTab("students"); }, active: stageFilter?.length === 1 && stageFilter[0] === "seed" },
+              { icon: CalendarDays, tone: "text-forest dark:text-leaf", value: testsThisWeek, label: testsThisWeek === 1 ? "session this week" : "sessions this week", onClick: () => goTab("reports"), active: false },
+              { icon: Users, tone: "text-amber", value: parentsConnected, label: parentsConnected === 1 ? "parent connected" : "parents connected", onClick: () => setParentsOpen(true), active: false },
+            ]).map(({ icon: Icon, tone, value, label, onClick, active }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={onClick}
+                className={`stat-chip flex items-center justify-center gap-3 rounded-2xl px-3 py-3 text-left hover:bg-white dark:hover:bg-white/5 ${active ? "bg-leaf/15 ring-1 ring-leaf/50" : ""}`}
+              >
+                <Icon className={`stat-icon h-6 w-6 shrink-0 ${tone}`} strokeWidth={2.4} />
+                <span className="text-sm sm:text-base">
+                  <b className="mr-1 text-lg">{value}</b>
+                  {label}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {lastAIResult && (
+            <div className="mb-8" data-tour="ai-result">
+              <AIResultPanel result={lastAIResult} />
+            </div>
+          )}
+
+          <Tabs value={tab} onValueChange={goTab} className="space-y-6">
+            {(tab !== "students" || viewMode === "classic") && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <TabsList>
+                  <TabsTrigger value="students">{t.students}</TabsTrigger>
+                  <TabsTrigger value="tests">{t.conductTests}</TabsTrigger>
+                  <TabsTrigger value="reports">{t.reports}</TabsTrigger>
+                </TabsList>
+                {tab === "students" && <ForestViewToggle view={viewMode} onViewChange={setViewMode} />}
+              </div>
+            )}
 
             <TabsContent value="students">
               {viewMode === "forest" ? (
-                // Forest View
-                <div className="space-y-4">
-                  <ForestScene
-                    students={forestStats.studentsWithStats}
-                    onStudentClick={handleStudentClick}
-                    sunlight={forestStats.sunlight}
-                    water={forestStats.water}
-                    rain={forestStats.parentInteraction > 50}
-                    className="min-h-[500px]"
-                  />
-                  
-                  {/* Student detail panel */}
-                  {selectedStudentForDetail && (
-                    <Card className="border-2 border-primary/30 animate-fade-in">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="flex items-center gap-2">
-                            🌳 {selectedStudentForDetail.name}
-                          </CardTitle>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setProgressModalStudent(selectedStudentForDetail)}>
-                              <TrendingUp className="h-4 w-4 mr-1" />
-                              {t.studentProgress}
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedStudentForDetail(null)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <CardDescription>
-                          Grade {selectedStudentForDetail.grade} • 
-                          Status: {selectedStudentForDetail.status === "flagged" ? "🍂 Needs Care" : "🌿 Healthy"}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <Button variant="outline" onClick={() => startTest("dyslexia", selectedStudentForDetail)}>
-                            <BookOpen className="h-4 w-4 mr-2" />
-                            Reading Test
-                          </Button>
-                          <Button variant="outline" onClick={() => startTest("dyscalculia", selectedStudentForDetail)}>
-                            <Calculator className="h-4 w-4 mr-2" />
-                            Math Test
-                          </Button>
-                          <Button variant="outline" onClick={() => startTest("dysgraphia", selectedStudentForDetail)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Writing Test
-                          </Button>
-                          <Button variant="outline" onClick={() => startTest("perception", selectedStudentForDetail)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Perception Test
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+                <ForestScene
+                  students={forestStats.studentsWithStats}
+                  selectedId={selectedStudentForDetail?.id ?? null}
+                  onSelect={setSelectedStudentForDetail}
+                  onStartScreening={startFullScreening}
+                  onViewProfile={(s) => setProfileStudent(s)}
+                  onViewHistory={(s) => setProgressModalStudent(s)}
+                  onSingleTest={requestSingleTest}
+                  onPerception={startPerception}
+                  onPlanSession={() => setPlanOpen(true)}
+                  onOpenParents={() => setParentsOpen(true)}
+                  onAddStudent={() => setDialogOpen(true)}
+                  onShowList={() => setViewMode("classic")}
+                  parentsConnected={parentsConnected}
+                  sunlight={forestStats.sunlight}
+                  rain={forestStats.parentInteraction > 50}
+                  stageFilter={stageFilter}
+                  onStageFilterChange={setStageFilter}
+                />
               ) : (
                 // Classic Table View
                 <Card>
@@ -621,9 +786,20 @@ export default function TeacherDashboard() {
                               </TableCell>
                               <TableCell>
                                 {student.parent_email ? (
-                                  <CheckCircle className="h-4 w-4 text-success" />
+                                  <span className="text-xs font-medium text-success flex items-center gap-1 cursor-pointer hover:underline" onClick={() => handleOpenEdit(student)} title={`Click to edit: ${student.parent_email}`}>
+                                    <CheckCircle className="h-4 w-4 text-success shrink-0" />
+                                    <span className="truncate max-w-[120px]">{student.parent_email}</span>
+                                  </span>
                                 ) : (
-                                  <span className="text-muted-foreground text-xs">Not linked</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-muted-foreground hover:text-foreground p-1"
+                                    onClick={() => handleOpenEdit(student)}
+                                  >
+                                    <Mail className="h-3.5 w-3.5 mr-1" />
+                                    + Link Email
+                                  </Button>
                                 )}
                               </TableCell>
                               <TableCell className="text-center min-w-[140px]">
@@ -648,14 +824,31 @@ export default function TeacherDashboard() {
                                     </DialogTrigger>
                                     <DialogContent>
                                       <DialogHeader>
-                                        <DialogTitle>Select Test for {student.name}</DialogTitle>
-                                        <DialogDescription>Choose which assessment to conduct</DialogDescription>
+                                        <DialogTitle>Screen {student.name}</DialogTitle>
+                                        <DialogDescription>
+                                          A screening includes all three DSM-5 tests. Single tests need your permission.
+                                        </DialogDescription>
                                       </DialogHeader>
                                       <div className="grid gap-4 pt-4">
-                                        <Button 
-                                          variant="outline" 
+                                        <Button
                                           className="h-auto py-4 justify-start"
-                                          onClick={() => startTest("dyslexia", student)}
+                                          onClick={() => startFullScreening(student)}
+                                        >
+                                          <div className="h-10 w-10 rounded-lg bg-primary-foreground/20 flex items-center justify-center mr-4">
+                                            <ListChecks className="h-5 w-5" />
+                                          </div>
+                                          <div className="text-left">
+                                            <p className="font-semibold">DSM-5 screening (all 3 tests)</p>
+                                            <p className="text-xs opacity-80">Reading → math → writing, one combined result</p>
+                                          </div>
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1 pt-2">
+                                          <Lock className="h-3 w-3" /> Single test (teacher permission required)
+                                        </p>
+                                        <Button
+                                          variant="outline"
+                                          className="h-auto py-4 justify-start"
+                                          onClick={() => requestSingleTest("dyslexia", student)}
                                         >
                                           <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center mr-4">
                                             <BookOpen className="h-5 w-5 text-primary" />
@@ -668,7 +861,7 @@ export default function TeacherDashboard() {
                                         <Button 
                                           variant="outline" 
                                           className="h-auto py-4 justify-start"
-                                          onClick={() => startTest("dyscalculia", student)}
+                                          onClick={() => requestSingleTest("dyscalculia", student)}
                                         >
                                           <div className="h-10 w-10 rounded-lg bg-accent/20 flex items-center justify-center mr-4">
                                             <Calculator className="h-5 w-5 text-accent" />
@@ -681,20 +874,20 @@ export default function TeacherDashboard() {
                                         <Button 
                                           variant="outline" 
                                           className="h-auto py-4 justify-start"
-                                          onClick={() => startTest("dysgraphia", student)}
+                                          onClick={() => requestSingleTest("dysgraphia", student)}
                                         >
                                           <div className="h-10 w-10 rounded-lg bg-secondary/20 flex items-center justify-center mr-4">
                                             <Pencil className="h-5 w-5 text-secondary" />
                                           </div>
                                           <div className="text-left">
                                             <p className="font-semibold">{t.dysgraphiaTest}</p>
-                                            <p className="text-xs text-muted-foreground">Drawing-based writing assessment</p>
+                                            <p className="text-xs text-muted-foreground">DSM-5 written expression assessment</p>
                                           </div>
                                         </Button>
                                         <Button 
                                           variant="outline" 
                                           className="h-auto py-4 justify-start"
-                                          onClick={() => startTest("perception", student)}
+                                          onClick={() => startPerception(student)}
                                         >
                                           <div className="h-10 w-10 rounded-lg bg-info/20 flex items-center justify-center mr-4">
                                             <Brain className="h-5 w-5 text-info" />
@@ -707,6 +900,23 @@ export default function TeacherDashboard() {
                                       </div>
                                     </DialogContent>
                                   </Dialog>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => setProfileStudent(student)}
+                                    title="Student profile & DSM-5 questionnaire"
+                                    aria-label={`Profile for ${student.name}`}
+                                  >
+                                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenEdit(student)}
+                                    title="Edit Student / Link Parent Email"
+                                  >
+                                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                                  </Button>
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
@@ -729,6 +939,41 @@ export default function TeacherDashboard() {
             </TabsContent>
 
             <TabsContent value="tests">
+              <Card className="mb-6 border-2 border-primary/50">
+                <CardContent className="pt-6 pb-6 flex flex-col md:flex-row md:items-center gap-4 justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center shrink-0">
+                      <ListChecks className="h-7 w-7 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">DSM-5 screening: all three tests</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Reading, math and writing in one session, scored together. This is the standard screening.
+                      </p>
+                    </div>
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="hero" className="md:w-56">Start screening</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Select Student</DialogTitle>
+                      </DialogHeader>
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        {students.map(s => (
+                          <Button key={s.id} variant="outline" className="w-full justify-start" onClick={() => startFullScreening(s)}>
+                            {s.name} - Grade {s.grade}
+                          </Button>
+                        ))}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </CardContent>
+              </Card>
+              <p className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
+                <Lock className="h-4 w-4" /> Single tests below need teacher permission and a recorded reason.
+              </p>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card className="border-2 border-primary/30">
                   <CardContent className="pt-8 pb-8">
@@ -737,7 +982,7 @@ export default function TeacherDashboard() {
                     </div>
                     <h3 className="text-xl font-semibold text-center mb-2">{t.dyslexiaTest}</h3>
                     <p className="text-sm text-muted-foreground text-center mb-6">
-                      DSM-5 compliant reading assessment
+                      DSM-5 reading assessment · single test
                     </p>
                     <Dialog>
                       <DialogTrigger asChild>
@@ -753,7 +998,7 @@ export default function TeacherDashboard() {
                               key={s.id} 
                               variant="outline" 
                               className="w-full justify-start"
-                              onClick={() => startTest("dyslexia", s)}
+                              onClick={() => requestSingleTest("dyslexia", s)}
                             >
                               {s.name} - Grade {s.grade}
                             </Button>
@@ -771,7 +1016,7 @@ export default function TeacherDashboard() {
                     </div>
                     <h3 className="text-xl font-semibold text-center mb-2">{t.dyscalculiaTest}</h3>
                     <p className="text-sm text-muted-foreground text-center mb-6">
-                      DSM-5 compliant number assessment
+                      DSM-5 mathematics assessment · single test
                     </p>
                     <Dialog>
                       <DialogTrigger asChild>
@@ -787,7 +1032,7 @@ export default function TeacherDashboard() {
                               key={s.id} 
                               variant="outline" 
                               className="w-full justify-start"
-                              onClick={() => startTest("dyscalculia", s)}
+                              onClick={() => requestSingleTest("dyscalculia", s)}
                             >
                               {s.name} - Grade {s.grade}
                             </Button>
@@ -805,7 +1050,7 @@ export default function TeacherDashboard() {
                     </div>
                     <h3 className="text-xl font-semibold text-center mb-2">{t.dysgraphiaTest}</h3>
                     <p className="text-sm text-muted-foreground text-center mb-6">
-                      Drawing-based writing assessment
+                      DSM-5 written expression assessment · single test
                     </p>
                     <Dialog>
                       <DialogTrigger asChild>
@@ -821,7 +1066,7 @@ export default function TeacherDashboard() {
                               key={s.id} 
                               variant="outline" 
                               className="w-full justify-start"
-                              onClick={() => startTest("dysgraphia", s)}
+                              onClick={() => requestSingleTest("dysgraphia", s)}
                             >
                               {s.name} - Grade {s.grade}
                             </Button>
@@ -843,9 +1088,9 @@ export default function TeacherDashboard() {
                     </p>
                     <Dialog>
                       <DialogTrigger asChild>
-                       <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-black font-semibold shadow-md">
-  {t.startTest}
-</Button>
+                        <Button variant="default" className="w-full font-semibold shadow-md">
+                          {t.startTest}
+                        </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
@@ -857,7 +1102,7 @@ export default function TeacherDashboard() {
                               key={s.id} 
                               variant="outline" 
                               className="w-full justify-start"
-                              onClick={() => startTest("perception", s)}
+                              onClick={() => startPerception(s)}
                             >
                               {s.name} - Grade {s.grade}
                             </Button>
@@ -989,8 +1234,120 @@ export default function TeacherDashboard() {
               onOpenChange={(open) => { if (!open) setReportSession(null); }}
             />
           )}
+
+          {/* Plan a session: pick a learner, start the full DSM-5 screening */}
+          <Dialog open={planOpen} onOpenChange={setPlanOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-forest dark:text-leaf" /> Plan a session</DialogTitle>
+                <DialogDescription>Pick a learner. Learners who haven't started yet are listed first.</DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+                {students.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Add a learner first.</p>}
+                {[...forestStats.studentsWithStats]
+                  .sort((a, b) => a.testCount - b.testCount || a.name.localeCompare(b.name))
+                  .map((s) => {
+                    const stage = getTreeStage(s.testCount);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { setPlanOpen(false); startFullScreening(s); }}
+                        className="group flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-forest hover:shadow-md"
+                      >
+                        <LeafIcon color={STAGE_LABELS[stage].leaf} className="h-7 w-7 shrink-0 transition-transform group-hover:-rotate-12" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{s.name}</span>
+                          <span className="block text-xs text-muted-foreground">Grade {s.grade} · {STAGE_LABELS[stage].label}</span>
+                        </span>
+                        <span className="flex items-center gap-1 text-sm font-semibold text-forest opacity-0 transition group-hover:opacity-100 dark:text-leaf">
+                          Start <ArrowRight className="h-4 w-4" />
+                        </span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Parent connections */}
+          <Dialog open={parentsOpen} onOpenChange={setParentsOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Link2 className="h-5 w-5 text-amber" /> Parent connections · {parentsConnected}</DialogTitle>
+                <DialogDescription>Linked parents can follow their child's progress in the parent portal.</DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+                {students.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No learners yet.</p>}
+                {[...students]
+                  .sort((a, b) => Number(!!a.parent_email) - Number(!!b.parent_email) || a.name.localeCompare(b.name))
+                  .map((s) => (
+                    <div key={s.id} className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-3">
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${s.parent_email ? "bg-amber/20 text-amber" : "bg-muted text-muted-foreground"}`}>
+                        {s.parent_email ? <Check className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">{s.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{s.parent_email || "No parent linked yet"}</span>
+                      </span>
+                      <Button size="sm" variant={s.parent_email ? "outline" : "default"} className={s.parent_email ? "rounded-full" : "rounded-full bg-forest text-forest-foreground hover:bg-forest hover:brightness-110"} onClick={() => { setParentsOpen(false); handleOpenEdit(s); }}>
+                        {s.parent_email ? "Edit" : "Link parent"}
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Student Parent Link Modal */}
+          {editingStudent && (
+            <Dialog open={!!editingStudent} onOpenChange={(open) => !open && setEditingStudent(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Parent Link for {editingStudent.name}</DialogTitle>
+                  <DialogDescription>
+                    Attach or update the parent's email address to allow them to access {editingStudent.name}'s progress.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editParentEmail">Parent Email Address</Label>
+                    <Input
+                      id="editParentEmail"
+                      type="email"
+                      placeholder="parent@email.com (e.g., ahaan8547@gmail.com)"
+                      value={editParentEmail}
+                      onChange={(e) => setEditParentEmail(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The parent can use this email address to log in to the Parent Portal.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter className="pt-4">
+                  <Button variant="outline" onClick={() => setEditingStudent(null)}>Cancel</Button>
+                  <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
+                    {isSavingEdit ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    {isSavingEdit ? "Saving..." : "Save Link"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
+      <StudentProfileDialog
+        open={profileStudent !== null}
+        onOpenChange={(o) => { if (!o) setProfileStudent(null); }}
+        student={profileStudent}
+      />
+      <SingleTestPermissionDialog
+        open={permissionRequest !== null}
+        studentName={permissionRequest?.student.name ?? ""}
+        testLabel={permissionRequest ? TEST_LABELS[permissionRequest.test].toLowerCase() : ""}
+        onCancel={() => setPermissionRequest(null)}
+        onConfirm={startPermittedSingleTest}
+      />
     </Layout>
   );
 }

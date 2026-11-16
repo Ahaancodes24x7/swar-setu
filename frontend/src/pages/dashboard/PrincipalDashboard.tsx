@@ -118,10 +118,10 @@ export default function PrincipalDashboard() {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Principal Dashboard</h1>
+              <h1 className="text-2xl md:text-3xl font-bold" data-tour="principal-title">Principal Dashboard</h1>
               <p className="text-muted-foreground">School-wide analytics and insights</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3" data-tour="principal-filter">
               <Select value={selectedGrade} onValueChange={setSelectedGrade}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Select Grade" />
@@ -249,6 +249,7 @@ export default function PrincipalDashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {gradeDetails.map((gd) => (
                     <div
+                      role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleGradeClick(gd.grade); } }}
                       key={gd.grade}
                       onClick={() => handleGradeClick(gd.grade)}
                       className="p-4 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
@@ -283,7 +284,7 @@ export default function PrincipalDashboard() {
           </Card>
 
           <Tabs defaultValue="grades" className="space-y-6">
-            <TabsList>
+            <TabsList data-tour="principal-tabs">
               <TabsTrigger value="grades">Grade Analysis</TabsTrigger>
               <TabsTrigger value="teachers">Teachers</TabsTrigger>
               <TabsTrigger value="cohorts">Cohort Comparison</TabsTrigger>
@@ -311,6 +312,7 @@ export default function PrincipalDashboard() {
                     ) : (
                       gradeStats.map((grade) => (
                         <div 
+                          role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleGradeClick(grade.grade); } }}
                           key={grade.grade} 
                           className="cursor-pointer hover:bg-muted/50 p-2 rounded-lg -mx-2"
                           onClick={() => handleGradeClick(grade.grade)}
@@ -346,6 +348,7 @@ export default function PrincipalDashboard() {
                       ) : (
                         gradeStats.map((grade) => (
                           <div 
+                            role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleGradeClick(grade.grade); } }}
                             key={grade.grade} 
                             className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted"
                             onClick={() => handleGradeClick(grade.grade)}

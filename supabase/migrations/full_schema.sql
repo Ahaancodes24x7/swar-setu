@@ -728,14 +728,28 @@ CREATE POLICY "principal_read_all_profiles"
   ));
 
 -- ===================== STUDENTS =====================
--- Drop existing restrictive SELECT policies
+-- Drop existing restrictive SELECT & UPDATE policies
 DROP POLICY IF EXISTS "Teachers can view their students" ON public.students;
+DROP POLICY IF EXISTS "Teachers can update their students" ON public.students;
 DROP POLICY IF EXISTS "principal_read_all_students" ON public.students;
+DROP POLICY IF EXISTS "Parents can update parent_id" ON public.students;
 
 -- Recreate as PERMISSIVE
-CREATE POLICY "Teachers can view their students"
+CREATE POLICY "Teachers and parents can view students"
   ON public.students FOR SELECT
-  USING (teacher_id = auth.uid() OR parent_id = auth.uid());
+  USING (
+    teacher_id = auth.uid() OR 
+    parent_id = auth.uid() OR 
+    LOWER(parent_email) = LOWER(auth.jwt() ->> 'email')
+  );
+
+CREATE POLICY "Teachers and parents can update students"
+  ON public.students FOR UPDATE
+  USING (
+    teacher_id = auth.uid() OR 
+    parent_id = auth.uid() OR 
+    LOWER(parent_email) = LOWER(auth.jwt() ->> 'email')
+  );
 
 CREATE POLICY "principal_read_all_students"
   ON public.students FOR SELECT

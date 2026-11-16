@@ -33,6 +33,7 @@ Key features:
 """
 
 import os
+import copy
 import json
 import pickle
 import warnings
@@ -40,6 +41,13 @@ from typing import Dict, Tuple, List, Optional, Any, Callable
 from pathlib import Path
 from datetime import datetime
 import unittest
+
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend"))
+try:
+    from ai.calibration import TemperatureScaler, compute_ece, save_temperature
+except ImportError:
+    from backend.ai.calibration import TemperatureScaler, compute_ece, save_temperature
 
 # Scientific computing
 import numpy as np
@@ -113,28 +121,35 @@ CONFIG = {
         "positive_rate": 0.15,          # ~15% prevalence per disorder (realistic)
         "comorbidity_corr": 0.35,       # Correlation between co-occurring disorders
         "signal_strength": 0.8,         # Feature-label correlation strength (0.0-1.0)
-        "effect_size": 1.2,             # Cohen's d effect size for disorder features
+        "effect_size": 0.6,             # Cohen's d effect size (calibrated to Swanson et al. 1999 meta-analysis)
         "noise_scale": 0.3,             # Realistic variability within groups
+        "measurement_noise": 0.08,      # Measurement error variance (Lord & Novick 1968 CTT)
     },
 
     # Model architecture (ResidualTransformerClassifier)
     "model": {
         "input_dim": 64,                # Input feature dimension
-        "embedding_dim": 128,           # Feature embedding dimension
+        "embedding_dim": 256,           # Feature embedding dimension (UPGRADED FROM 128)
         "hidden_dim": 256,              # Hidden layer dimension
         "num_residual_blocks": 4,       # Depth of residual blocks
         "num_attention_heads": 4,       # Multi-head attention heads
         "dropout_rate": 0.3,            # Dropout for MC Dropout
         "layer_norm_eps": 1e-6,         # Layer normalization epsilon
+        "tokenization_mode": "feature_groups", # Feature tokenization mode ("feature_groups" or "feature_tokens")
+        "num_feature_groups": 4,        # Sequence length S = 4 semantic groups (S > 1)
+        "cnn_image_dim": 64,            # Dysgraphia CNN embedding dimension
+        "bilstm_hidden_dim": 64,        # Reading BiLSTM embedding dimension
     },
 
-    # Loss function (AsymmetricLoss - Ben-Baruch et al. 2021)
+    # Loss function (AsymmetricLoss - Ben-Baruch et al. 2021 + Dice Loss)
     "loss": {
         "gamma_pos": 0.0,               # Focus on hard negatives
         "gamma_neg": 4.0,               # Penalty for false negatives in screening
         "clip_margin": 0.05,            # Probability clipping margin
         "pos_weight": None,             # Will be computed from class distribution
         "label_smoothing": 0.05,        # Smooth labels to reduce overconfidence
+        "dice_weight": 0.1,             # Weight lambda for Dice loss component
+        "eps": 1e-6,                    # Epsilon for Dice loss numerical stability
     },
 
     # Training hyperparameters
@@ -262,62 +277,66 @@ class SLDSyntheticDataGenerator:
                 if np.random.rand() < comorbidity_corr:
                     y[i, 2] = 1  # Also dysgraphia (50% co-occurrence)
 
-        # Step 3: Generate features CONDITIONED on disorder status
-        # This creates the learnable signal the model needs
+        # Step 3: Generate correlated base features within domain blocks (rho=0.35)
         X = np.zeros((n_samples, n_features))
         feature_groups = data_cfg["feature_groups"]
-        signal_strength = data_cfg["signal_strength"]  # 0.0-1.0
-        effect_size = data_cfg["effect_size"]  # Cohen's d
-        noise_scale = data_cfg["noise_scale"]  # Realistic variability
+        signal_strength = data_cfg.get("signal_strength", 0.8)
+        effect_size = data_cfg.get("effect_size", 0.6)  # Calibrated Cohen's d = 0.6
+        noise_scale = data_cfg.get("noise_scale", 0.3)
+        meas_noise_scale = data_cfg.get("measurement_noise", 0.08)
 
-        # Base features ~ N(0, 1) for all samples
-        X[:, :] = np.random.randn(n_samples, n_features) * noise_scale
+        for group_name, (start_idx, end_idx) in feature_groups.items():
+            dim = end_idx - start_idx
+            cov_mat = np.full((dim, dim), 0.35)
+            np.fill_diagonal(cov_mat, 1.0)
+            X[:, start_idx:end_idx] = np.random.multivariate_normal(
+                mean=np.zeros(dim), cov=cov_mat * (noise_scale ** 2), size=n_samples
+            )
 
-        # Dyslexia-related features: shift toward IMPAIRED when disorder present
-        # Research basis: Cohen's d effect sizes 0.5-1.2 for SLD features
-        dyslexia_feat_idx = list(range(feature_groups["dyslexia"][0],
-                                       feature_groups["dyslexia"][1]))
+        # Step 4: Condition features on disorder status (d = 0.6 effect size)
+        dyslexia_feat_idx = list(range(feature_groups["dyslexia"][0], feature_groups["dyslexia"][1]))
         dyslexia_mask = y[:, 0] == 1
         if dyslexia_mask.sum() > 0:
-            # Children WITH dyslexia: lower reading features (impaired)
             shift = -effect_size * signal_strength
-            # Use proper numpy indexing: apply mask first, then feature indices
             X[np.ix_(dyslexia_mask, dyslexia_feat_idx)] += shift
 
-        # Dyscalculia-related features: shift toward IMPAIRED when disorder present
-        dyscalculia_feat_idx = list(range(feature_groups["dyscalculia"][0],
-                                          feature_groups["dyscalculia"][1]))
+        dyscalculia_feat_idx = list(range(feature_groups["dyscalculia"][0], feature_groups["dyscalculia"][1]))
         dyscalculia_mask = y[:, 1] == 1
         if dyscalculia_mask.sum() > 0:
-            # Children WITH dyscalculia: lower math features (impaired)
             shift = -effect_size * signal_strength
-            # Use proper numpy indexing
             X[np.ix_(dyscalculia_mask, dyscalculia_feat_idx)] += shift
 
-        # Dysgraphia-related features: shift toward IMPAIRED when disorder present
-        dysgraphia_feat_idx = list(range(feature_groups["dysgraphia"][0],
-                                         feature_groups["dysgraphia"][1]))
+        dysgraphia_feat_idx = list(range(feature_groups["dysgraphia"][0], feature_groups["dysgraphia"][1]))
         dysgraphia_mask = y[:, 2] == 1
         if dysgraphia_mask.sum() > 0:
-            # Children WITH dysgraphia: lower writing features (impaired)
             shift = -effect_size * signal_strength
-            # Use proper numpy indexing
             X[np.ix_(dysgraphia_mask, dysgraphia_feat_idx)] += shift
 
-        # Behavioral features: weak signal across all disorders
-        behavioral_feat_idx = list(range(feature_groups["behavioral"][0],
-                                         feature_groups["behavioral"][1]))
+        behavioral_feat_idx = list(range(feature_groups["behavioral"][0], feature_groups["behavioral"][1]))
         behavioral_mask = y.sum(axis=1) > 0
         if behavioral_mask.sum() > 0:
-            # Children WITH any disorder: slightly lower behavioral features
-            shift = -0.4 * signal_strength
-            # Use proper numpy indexing
+            shift = -0.3 * signal_strength
             X[np.ix_(behavioral_mask, behavioral_feat_idx)] += shift
 
-        # Step 4: Add realistic noise within groups
-        X += np.random.randn(n_samples, n_features) * noise_scale
+        # Step 5: Add Comorbid Noise / Cross-disorder feature interaction
+        for i in range(n_samples):
+            if y[i, 0] == 1:
+                X[i, dysgraphia_feat_idx] -= 0.12 * np.random.rand(len(dysgraphia_feat_idx))
+            if y[i, 1] == 1:
+                X[i, dyslexia_feat_idx] -= 0.08 * np.random.rand(len(dyslexia_feat_idx))
 
-        # Step 5: Normalize features to reasonable range [0, 1]
+        # Step 6: Add Demographic Variation (Age groups & Language background)
+        age_group = np.random.choice([0, 1, 2], size=n_samples, p=[0.3, 0.4, 0.3])
+        X[age_group == 0, :16] -= 0.12  # Younger children (7-8yr) lower reading baseline
+        X[age_group == 2, :16] += 0.08  # Older children (11-12yr) higher baseline
+
+        lang_bg = np.random.choice(['hindi', 'english'], size=n_samples, p=[0.6, 0.4])
+        X[lang_bg == 'hindi', 0:8] -= 0.10  # Non-native phonological variation
+
+        # Step 7: Add Classical Measurement Noise (Lord & Novick 1968 CTT, sigma = 0.08)
+        X += np.random.normal(0, meas_noise_scale, size=X.shape)
+
+        # Step 8: Normalize features to reasonable range [0, 1]
         X = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0) + 1e-6)
 
         metadata = {
@@ -452,12 +471,120 @@ class ResidualBlock(nn.Module):
         return out
 
 
+# ============================================================================
+# SECTION 4: MULTIMODAL PATHWAYS AND MODEL ARCHITECTURE
+# ============================================================================
+
+class DysgraphiaCNN(nn.Module):
+    """
+    CNN image pathway for canvas/handwriting images.
+    Input: [B, C, H, W] canvas rendering.
+    Output: Learned image embedding [B, out_dim].
+    """
+    def __init__(self, in_channels: int = 1, out_dim: int = 64):
+        super().__init__()
+        self.conv_layers = nn.Sequential(
+            nn.Conv2d(in_channels, 16, kernel_size=3, padding=1),
+            nn.GroupNorm(4, 16),
+            nn.GELU(),
+            nn.MaxPool2d(2),  # 64x64 -> 32x32
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.GroupNorm(4, 32),
+            nn.GELU(),
+            nn.MaxPool2d(2),  # 32x32 -> 16x16
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.GroupNorm(8, 64),
+            nn.GELU(),
+            nn.AdaptiveAvgPool2d((4, 4))
+        )
+        self.fc = nn.Linear(64 * 4 * 4, out_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.ndim == 3:
+            x = x.unsqueeze(1)
+        B = x.shape[0]
+        out = self.conv_layers(x)
+        out = out.reshape(B, -1)
+        return self.fc(out)
+
+
+class DysgraphiaFusionLayer(nn.Module):
+    """
+    Fuses learned CNN handwriting image embedding with engineered 16-D stroke features.
+    """
+    def __init__(self, img_dim: int = 64, stroke_dim: int = 16, fused_dim: int = 16):
+        super().__init__()
+        self.fusion = nn.Sequential(
+            nn.Linear(img_dim + stroke_dim, fused_dim * 2),
+            nn.GELU(),
+            nn.Linear(fused_dim * 2, fused_dim)
+        )
+
+    def forward(self, img_emb: torch.Tensor, stroke_feat: torch.Tensor) -> torch.Tensor:
+        concat = torch.cat([img_emb, stroke_feat], dim=-1)
+        return self.fusion(concat)
+
+
+class ReadingBiLSTM(nn.Module):
+    """
+    BiLSTM temporal pathway for genuine sequential reading data.
+    Input: Reading sequence [B, T, D_seq] and optional sequence lengths.
+    Output: Fixed-size temporal embedding [B, out_dim].
+    """
+    def __init__(self, input_dim: int = 4, hidden_dim: int = 64,
+                 num_layers: int = 2, dropout: float = 0.2, out_dim: int = 64):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout if num_layers > 1 else 0.0
+        )
+        self.fc = nn.Linear(hidden_dim * 2 * 2, out_dim)
+
+    def forward(self, x: torch.Tensor, seq_lengths: Optional[torch.Tensor] = None) -> torch.Tensor:
+        B, T, _ = x.shape
+        if seq_lengths is not None:
+            packed_input = nn.utils.rnn.pack_padded_sequence(
+                x, seq_lengths.cpu(), batch_first=True, enforce_sorted=False
+            )
+            packed_output, _ = self.lstm(packed_input)
+            output, _ = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True, total_length=T)
+        else:
+            output, _ = self.lstm(x)
+
+        mean_pool = output.mean(dim=1)
+        max_pool, _ = output.max(dim=1)
+        concat_pool = torch.cat([mean_pool, max_pool], dim=-1)
+        return self.fc(concat_pool)
+
+
+class ReadingFusionLayer(nn.Module):
+    """
+    Fuses BiLSTM temporal reading sequence embedding with aggregate reading features.
+    """
+    def __init__(self, seq_emb_dim: int = 64, agg_feat_dim: int = 16, fused_dim: int = 16):
+        super().__init__()
+        self.fusion = nn.Sequential(
+            nn.Linear(seq_emb_dim + agg_feat_dim, fused_dim * 2),
+            nn.GELU(),
+            nn.Linear(fused_dim * 2, fused_dim)
+        )
+
+    def forward(self, seq_emb: torch.Tensor, agg_feat: torch.Tensor) -> torch.Tensor:
+        concat = torch.cat([seq_emb, agg_feat], dim=-1)
+        return self.fusion(concat)
+
+
 class FeatureAttention(nn.Module):
     """
-    Multi-head self-attention on feature embeddings.
+    Multi-head self-attention on semantic feature group tokens (S > 1).
     
     Reference: Vaswani et al. (2017) "Attention Is All You Need"
-    Captures which features correlate with each disorder.
+    Exposes multiple meaningful tokens (S = 4 semantic domain groups)
+    so self-attention computes non-trivial inter-feature interactions.
     """
 
     def __init__(self, dim: int, num_heads: int = 4):
@@ -469,42 +596,51 @@ class FeatureAttention(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(0.1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Args:
-            x: (batch_size, n_features, embedding_dim)
+            x: (batch_size, S, embedding_dim) where S > 1
         
         Returns:
-            out: Attended features (batch_size, n_features, embedding_dim)
-            attn_weights: Attention weights for interpretability
+            out: Attended feature tokens (batch_size, S, embedding_dim)
+            attn_weights: Attention weights (batch_size, num_heads, S, S)
         """
-        B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
-        qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, num_heads, N, head_dim)
+        assert x.ndim == 3, f"FeatureAttention expects 3D tensor [B, S, E], got shape {x.shape}"
+        B, S, C = x.shape
+        assert S > 1, f"Attention sequence length S must be > 1 to model feature interactions! Got S={S}"
+
+        qkv = self.qkv(x).reshape(B, S, 3, self.num_heads, C // self.num_heads)
+        qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, num_heads, S, head_dim)
         q, k, v = qkv[0], qkv[1], qkv[2]
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
 
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-        x = self.proj(x)
-        x = self.proj_drop(x)
+        x_out = (attn @ v).transpose(1, 2).reshape(B, S, C)
+        x_out = self.proj(x_out)
+        x_out = self.proj_drop(x_out)
 
-        return x, attn
+        return x_out, attn
 
 
 class LabelCorrelationLayer(nn.Module):
     """
-    Learnable label correlation matrix capturing comorbidity patterns.
+    Learnable multi-label correlation matrix capturing comorbidity patterns via sigmoid formulation.
+    
+    Mathematical Formulation:
+    C_ij = sigmoid(A_ij)
+    where A_ij is initialized from log-odds of clinical comorbidity priors:
+        A_ij = logit(P_ij) = log(P_ij / (1 - P_ij))
+    
+    Properties:
+    1. Multi-label compatible: Probabilities are NOT constrained to sum to 1.
+    2. Asymmetric relationships: C_ij != C_ji is fully supported.
+    3. Explicit diagonal behavior: Self-correlation C_ii = 1.0 is preserved.
+    4. Learnable parameters: A_ij and alpha receive backpropagation gradients.
+    5. Numerically stable with preserved gradient flow.
     
     Reference: Wang et al. (2016) "CNN-RNN: A Large-Scale Hierarchical Image..."
-    Allows model to learn that e.g., Dyslexia and Dysgraphia co-occur.
-    
-    Initialized with research-backed priors from:
-    Willcutt et al. (2013) "Comorbidity of Reading Disability and Attention-Deficit/
-    Hyperactivity Disorder" Topics in Language Disorders
-    
-    Comorbidity rates:
+    Priors from Willcutt et al. (2013) Topics in Language Disorders:
     - P(Dysgraphia | Dyslexia) ≈ 0.60
     - P(Dyslexia | Dysgraphia) ≈ 0.50
     - P(Dyscalculia | Dyslexia) ≈ 0.40
@@ -513,48 +649,58 @@ class LabelCorrelationLayer(nn.Module):
 
     def __init__(self, num_labels: int = 3):
         super().__init__()
-        # Initialize with research-backed comorbidity priors
-        prior_correlation = torch.tensor([
-            [1.0, 0.40, 0.50],   # Dyslexia row: [self, dyscalc, dysgraph]
-            [0.35, 1.0, 0.25],   # Dyscalculia row
-            [0.60, 0.25, 1.0],   # Dysgraphia row
-        ], dtype=torch.float32)
-        
-        # Make it learnable, initialized at prior
-        self.correlation = nn.Parameter(prior_correlation)
-        self.alpha = nn.Parameter(torch.tensor(0.1))  # Learnable weight
+        self.num_labels = num_labels
 
-    def forward(self, logits):
+        # Clinical comorbidity priors P_ij = P(disorder_j | disorder_i)
+        prior_p = torch.tensor([
+            [0.999, 0.40,  0.50],   # Dyslexia row: [self, dyscalc, dysgraph]
+            [0.35,  0.999, 0.25],   # Dyscalculia row
+            [0.60,  0.25,  0.999],  # Dysgraphia row
+        ], dtype=torch.float32)
+
+        # Initialize learnable matrix A from logit(P_ij)
+        logit_prior = torch.log(prior_p / (1.0 - prior_p))
+        self.correlation_logits = nn.Parameter(logit_prior)
+        self.alpha = nn.Parameter(torch.tensor(0.1, dtype=torch.float32))
+
+    def get_correlation_matrix(self) -> torch.Tensor:
+        """Returns the explicit C_ij = sigmoid(A_ij) correlation matrix with C_ii = 1.0."""
+        corr = torch.sigmoid(self.correlation_logits)
+        eye = torch.eye(self.num_labels, device=corr.device, dtype=corr.dtype)
+        # Enforce diagonal self-correlation strictly equal to 1.0
+        corr = corr * (1.0 - eye) + eye
+        return corr
+
+    def forward(self, logits: torch.Tensor) -> torch.Tensor:
         """
         Args:
             logits: Raw predictions (batch_size, 3)
-        
         Returns:
-            adjusted_logits: Logits adjusted by learned comorbidity patterns
+            adjusted_logits: Multi-label logits adjusted by comorbidity patterns
         """
-        # Normalize correlation to valid probability range
-        corr_normalized = torch.softmax(self.correlation, dim=-1)
-        
-        # Apply label correlations with learnable weight
-        # Each logit can be adjusted based on other logits
-        corr_adjustment = (corr_normalized @ logits.unsqueeze(-1)).squeeze(-1)
+        corr = self.get_correlation_matrix()  # (3, 3)
+        probs = torch.sigmoid(logits)         # (batch_size, 3)
+
+        # Apply correlation adjustment in probability space
+        corr_adjustment = (probs @ corr.T) - probs
         adjusted_logits = logits + self.alpha * corr_adjustment
-        
+
         return adjusted_logits
 
 
 class ResidualTransformerClassifier(nn.Module):
     """
-    Unified SLD screening model using residual transformer architecture.
+    Unified SLD screening model using 256-D residual transformer architecture
+    with multi-token feature attention (S > 1), multimodal pathways, and sigmoid label correlation.
     
     Architecture:
-    1. Feature embedding
-    2. Stack of residual blocks
-    3. Multi-head feature attention
-    4. Label correlation learning
-    5. Output logits with MC Dropout support
-    
-    Reference: Gorishniy et al. (2021) NeurIPS - FT-Transformer for tabular data
+    1. Multimodal Feature Fusion (Tabular + Canvas CNN + Reading BiLSTM)
+    2. Semantic Feature Group Tokenization (S = 4 semantic tokens of dimension 256)
+    3. Multi-Head Self-Attention over S tokens (attn_weights: [B, H, S, S])
+    4. Stack of 4 Residual Blocks (256-D)
+    5. Mean pooling across sequence tokens -> 256-D representation
+    6. Output linear head -> 3 disorder logits
+    7. Sigmoid Label Correlation Layer -> 3 adjusted multi-label logits
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -562,103 +708,165 @@ class ResidualTransformerClassifier(nn.Module):
         self.config = config
         model_cfg = config["model"]
 
-        # Feature embedding
-        self.embedding = nn.Linear(model_cfg["input_dim"],
-                                    model_cfg["embedding_dim"])
+        self.input_dim = model_cfg["input_dim"]             # 64
+        self.embedding_dim = model_cfg["embedding_dim"]     # 256
+        self.num_groups = model_cfg.get("num_feature_groups", 4) # S = 4
+        self.hidden_dim = model_cfg["hidden_dim"]           # 256
+        self.dropout_rate = model_cfg["dropout_rate"]
 
-        # Residual blocks
-        self.residual_blocks = nn.ModuleList()
-        hidden_dim = model_cfg["hidden_dim"]
-        embedding_dim = model_cfg["embedding_dim"]
+        # Multimodal pathways
+        self.cnn_pathway = DysgraphiaCNN(in_channels=1, out_dim=model_cfg.get("cnn_image_dim", 64))
+        self.dysgraphia_fusion = DysgraphiaFusionLayer(
+            img_dim=model_cfg.get("cnn_image_dim", 64), stroke_dim=16, fused_dim=16
+        )
 
-        for _ in range(model_cfg["num_residual_blocks"]):
-            self.residual_blocks.append(
-                ResidualBlock(embedding_dim, hidden_dim, embedding_dim,
-                              dropout_rate=model_cfg["dropout_rate"])
-            )
+        self.bilstm_pathway = ReadingBiLSTM(
+            input_dim=4, hidden_dim=model_cfg.get("bilstm_hidden_dim", 64),
+            num_layers=2, dropout=0.2, out_dim=64
+        )
+        self.reading_fusion = ReadingFusionLayer(
+            seq_emb_dim=64, agg_feat_dim=16, fused_dim=16
+        )
 
-        # Feature attention
-        self.attention = FeatureAttention(embedding_dim,
+        # 4 Semantic group linear projections to 256-D embedding space
+        # Features 0..15 (Dyslexia), 16..31 (Dyscalculia), 32..47 (Dysgraphia), 48..63 (Behavioral)
+        self.group_projections = nn.ModuleList([
+            nn.Linear(16, self.embedding_dim) for _ in range(self.num_groups)
+        ])
+
+        # Multi-head attention over S tokens (S = 4, dim = 256)
+        self.attention = FeatureAttention(self.embedding_dim,
                                           num_heads=model_cfg["num_attention_heads"])
 
-        # Label correlation
+        # 4 Residual blocks (256-D)
+        self.residual_blocks = nn.ModuleList([
+            ResidualBlock(self.embedding_dim, self.hidden_dim, self.embedding_dim,
+                          dropout_rate=self.dropout_rate)
+            for _ in range(model_cfg["num_residual_blocks"])
+        ])
+
+        # Label correlation layer
         self.label_correlation = LabelCorrelationLayer(num_labels=3)
 
         # Output layer
-        self.output = nn.Linear(embedding_dim, 3)  # 3 disorders
+        self.output = nn.Linear(self.embedding_dim, 3)
 
-    def forward(self, x, return_attention_weights=False):
+    def _tokenize_features(self, x_tabular: torch.Tensor,
+                          x_image: Optional[torch.Tensor] = None,
+                          x_sequence: Optional[torch.Tensor] = None,
+                          seq_lengths: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
-        Args:
-            x: Input features (batch_size, input_dim)
-            return_attention_weights: If True, return attention visualization
+        Tokenizes 64 input features (plus optional CNN image / BiLSTM sequence)
+        into S=4 semantic tokens of dimension 256.
+        """
+        B = x_tabular.shape[0]
+        assert x_tabular.shape[1] == 64, f"Expected 64 input features, got {x_tabular.shape[1]}"
+
+        # Extract 4 feature groups (16 features each)
+        f_dyslexia = x_tabular[:, 0:16].clone()
+        f_dyscalculia = x_tabular[:, 16:32]
+        f_dysgraphia = x_tabular[:, 32:48].clone()
+        f_behavioral = x_tabular[:, 48:64]
+
+        # Apply multimodal fusion if optional inputs provided
+        if x_image is not None:
+            img_emb = self.cnn_pathway(x_image)
+            f_dysgraphia = self.dysgraphia_fusion(img_emb, f_dysgraphia)
+
+        if x_sequence is not None:
+            seq_emb = self.bilstm_pathway(x_sequence, seq_lengths)
+            f_dyslexia = self.reading_fusion(seq_emb, f_dyslexia)
+
+        group_inputs = [f_dyslexia, f_dyscalculia, f_dysgraphia, f_behavioral]
+
+        # Project each group to embedding_dim (256)
+        tokens = [proj(g) for proj, g in zip(self.group_projections, group_inputs)]
+        tokens = torch.stack(tokens, dim=1)  # [B, S=4, 256]
+
+        assert tokens.shape == (B, self.num_groups, self.embedding_dim), \
+            f"Expected token shape ({B}, {self.num_groups}, {self.embedding_dim}), got {tokens.shape}"
+        return tokens
+
+    def forward(self, x: torch.Tensor,
+                x_image: Optional[torch.Tensor] = None,
+                x_sequence: Optional[torch.Tensor] = None,
+                seq_lengths: Optional[torch.Tensor] = None,
+                return_attention_weights: bool = False):
+        """
+        Multimodal Forward Pass.
         
-        Returns:
-            logits: Raw predictions (batch_size, 3)
-            attention_weights: (optional) for interpretability
+        Args:
+            x: Tabular features (batch_size, 64)
+            x_image: (optional) Canvas image tensor (batch_size, 1, 64, 64)
+            x_sequence: (optional) Reading sequence (batch_size, T, D_seq)
+            seq_lengths: (optional) Sequence lengths (batch_size,)
+            return_attention_weights: If True, return attention matrix [B, H, S, S]
         """
-        # Feature embedding
-        x = self.embedding(x)  # (batch_size, embedding_dim)
+        B = x.shape[0]
+        # Step 1: Tokenize features into S=4 tokens [B, 4, 256]
+        tokens = self._tokenize_features(x, x_image, x_sequence, seq_lengths)
 
-        # Reshape for attention: treat embedding as single sequence
-        x = x.unsqueeze(1)  # (batch_size, 1, embedding_dim)
+        # Step 2: Multi-head self-attention over tokens S=4
+        attended_tokens, attn_weights = self.attention(tokens)  # [B, 4, 256], [B, H, 4, 4]
+        assert attn_weights.shape == (B, self.config["model"]["num_attention_heads"], self.num_groups, self.num_groups)
 
-        # Residual blocks
+        # Step 3: Residual blocks over token sequence
+        x_rep = attended_tokens
         for block in self.residual_blocks:
-            x = block(x.squeeze(1))
-            x = x.unsqueeze(1)
+            x_rep = block(x_rep)
 
-        # Attention over features
-        x, attn_weights = self.attention(x)
-        x = x.squeeze(1)  # (batch_size, embedding_dim)
+        # Mean pooling across token sequence -> [B, 256] representation
+        pooled_rep = x_rep.mean(dim=1)
+        assert pooled_rep.shape == (B, self.embedding_dim), f"Expected shape ({B}, {self.embedding_dim}), got {pooled_rep.shape}"
 
-        # Raw logits
-        logits = self.output(x)  # (batch_size, 3)
+        # Step 4: Output logits
+        raw_logits = self.output(pooled_rep)
 
-        # Apply label correlation
-        logits = self.label_correlation(logits)
+        # Step 5: Sigmoid Label Correlation Layer
+        logits = self.label_correlation(raw_logits)
 
         if return_attention_weights:
             return logits, attn_weights
 
         return logits
 
-    def mc_predict(self, x: torch.Tensor, n_samples: int = 10) -> Tuple[torch.Tensor, torch.Tensor]:
+    def inspect_attention(self, x: torch.Tensor,
+                          x_image: Optional[torch.Tensor] = None,
+                          x_sequence: Optional[torch.Tensor] = None) -> Dict[str, Any]:
         """
-        Monte Carlo Dropout prediction with uncertainty quantification.
-        
-        Reference: Gal & Ghahramani (2016) ICML
-        Keep dropout ACTIVE during inference, run multiple forward passes.
-        
-        Args:
-            x: Input features (batch_size, input_dim)
-            n_samples: Number of MC dropout samples
-        
-        Returns:
-            mean_pred: Mean prediction (batch_size, 3)
-            uncertainty: Prediction uncertainty (batch_size, 3)
+        Inspect attention weights matrix across feature domain groups.
+        Returns attention weights tensor of shape [B, H, S, S] and mean attention map.
         """
-        # Save original training state
+        self.eval()
+        with torch.no_grad():
+            _, attn_weights = self.forward(x, x_image, x_sequence, return_attention_weights=True)
+            mean_attn = attn_weights.mean(dim=1)  # Average over attention heads: [B, S, S]
+
+        group_names = ["Reading/Phonological", "Math/Processing", "Motor/Writing", "Behavioral/Executive"]
+        return {
+            "attention_weights": attn_weights,
+            "mean_attention_map": mean_attn,
+            "group_names": group_names,
+            "sequence_length": self.num_groups
+        }
+
+    def mc_predict(self, x: torch.Tensor,
+                   x_image: Optional[torch.Tensor] = None,
+                   x_sequence: Optional[torch.Tensor] = None,
+                   n_samples: int = 10) -> Tuple[torch.Tensor, torch.Tensor]:
         training_state = self.training
-        
-        # Simple approach: keep model in train mode for MC Dropout
-        # LayerNorm has no batch statistics, so this works correctly
         self.train()
 
         predictions = []
         with torch.no_grad():
             for _ in range(n_samples):
-                pred = torch.sigmoid(self.forward(x))
+                pred = torch.sigmoid(self.forward(x, x_image=x_image, x_sequence=x_sequence))
                 predictions.append(pred)
 
-        # Restore original state
         if not training_state:
             self.eval()
 
-        # Stack predictions: (n_samples, batch_size, 3)
         predictions = torch.stack(predictions, dim=0)
-
-        # Mean and std per prediction
         mean_pred = predictions.mean(dim=0)
         uncertainty = predictions.std(dim=0)
 
@@ -666,81 +874,89 @@ class ResidualTransformerClassifier(nn.Module):
 
 
 # ============================================================================
-# SECTION 5: LOSS FUNCTION
+# SECTION 5: LOSS FUNCTIONS (ASL + DICE LOSS)
 # ============================================================================
+
+class DiceLoss(nn.Module):
+    """
+    Multi-Label Continuous Soft Dice Loss.
+    Reference: Milletari et al. (2016) "V-Net: Fully Convolutional Neural Networks..."
+    """
+    def __init__(self, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        probs = torch.sigmoid(logits)
+        targets_float = targets.float()
+
+        intersection = 2.0 * torch.sum(probs * targets_float, dim=0) + self.eps
+        cardinality = torch.sum(probs**2 + targets_float**2, dim=0) + self.eps
+        dice_per_label = 1.0 - (intersection / cardinality)
+        return torch.mean(dice_per_label)
+
 
 class AsymmetricLoss(nn.Module):
     """
-    Asymmetric Loss for Multi-Label Classification with Label Smoothing.
+    Asymmetric Loss for Multi-Label Classification with Label Smoothing + Optional Dice Loss.
     
     Reference: Ben-Baruch et al. (2021) "Asymmetric Loss For Multi-Label
     Classification" ICCV
     
-    Designed for medical screening where false negatives (missing disorder) are
-    more costly than false positives (flagging for further evaluation).
-    
-    Loss = (1 - p_t)^gamma_pos * log(p_t) for positive labels
-          (p_t)^gamma_neg * log(1 - p_t) for negative labels
-    
-    Label Smoothing Reference: Müller et al. (2019) "When Does Label Smoothing Help?"
-    NeurIPS 2019 - reduces overconfidence and improves calibration.
-    
-    Class Weighting Reference: King & Zeng (2001) "Logistic Regression in Rare Event
-    Data" Political Analysis - weights positive class inversely by frequency.
+    Total Loss = ASL + lambda * DiceLoss
     """
 
     def __init__(self, gamma_pos: float = 0.0, gamma_neg: float = 4.0,
-                 clip_margin: float = 0.05, label_smoothing: float = 0.05):
-        """
-        Args:
-            gamma_pos: Focusing parameter for positive class (hard negatives)
-            gamma_neg: Focusing parameter for negative class (false negatives)
-            clip_margin: Margin for probability clipping
-            label_smoothing: Label smoothing factor epsilon (0.0-0.1)
-        """
+                 clip_margin: float = 0.05, label_smoothing: float = 0.05,
+                 dice_weight: float = 0.1, eps: float = 1e-6):
         super().__init__()
         self.gamma_pos = gamma_pos
         self.gamma_neg = gamma_neg
         self.clip_margin = clip_margin
         self.label_smoothing = label_smoothing
+        self.dice_weight = dice_weight
+        self.dice = DiceLoss(eps=eps)
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor,
                 class_weights: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Args:
-            logits: Raw model outputs (batch_size, 3)
-            targets: Binary targets (batch_size, 3)
-            class_weights: Per-disorder class weights (optional)
-        
-        Returns:
-            loss: Scalar loss value
-        """
-        # Apply label smoothing: smooth targets toward 0.5
-        # Prevents overconfidence in predictions
         targets_smooth = targets * (1.0 - self.label_smoothing) + 0.5 * self.label_smoothing
-        
-        # Sigmoid to get probabilities
         probs = torch.sigmoid(logits)
-
-        # Clip probabilities for numerical stability
         probs = torch.clamp(probs, self.clip_margin, 1.0 - self.clip_margin)
 
-        # Asymmetric loss computation
-        # For positive labels: down-weight easy positives
         loss_pos = -((1 - probs) ** self.gamma_pos) * torch.log(probs)
-
-        # For negative labels: up-weight false negatives (hard negatives)
         loss_neg = -(probs ** self.gamma_neg) * torch.log(1 - probs)
 
-        # Combine based on targets (using smoothed targets)
-        loss = targets_smooth * loss_pos + (1 - targets_smooth) * loss_neg
+        asl_loss = targets_smooth * loss_pos + (1 - targets_smooth) * loss_neg
 
-        # Apply class weights if provided
-        # Weights should be (batch_size, 3) where each value is the weight for that label
         if class_weights is not None:
-            loss = loss * class_weights
+            asl_loss = asl_loss * class_weights
 
-        return loss.mean()
+        asl_mean = asl_loss.mean()
+
+        if self.dice_weight <= 0:
+            return asl_mean
+
+        dice_mean = self.dice(logits, targets)
+        return asl_mean + self.dice_weight * dice_mean
+
+    def forward_detailed(self, logits: torch.Tensor, targets: torch.Tensor,
+                         class_weights: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Returns (total_loss, asl_loss, dice_loss) for separate loss tracking."""
+        targets_smooth = targets * (1.0 - self.label_smoothing) + 0.5 * self.label_smoothing
+        probs = torch.sigmoid(logits)
+        probs = torch.clamp(probs, self.clip_margin, 1.0 - self.clip_margin)
+
+        loss_pos = -((1 - probs) ** self.gamma_pos) * torch.log(probs)
+        loss_neg = -(probs ** self.gamma_neg) * torch.log(1 - probs)
+
+        asl_loss = targets_smooth * loss_pos + (1 - targets_smooth) * loss_neg
+        if class_weights is not None:
+            asl_loss = asl_loss * class_weights
+
+        asl_mean = asl_loss.mean()
+        dice_mean = self.dice(logits, targets)
+        total_loss = asl_mean + self.dice_weight * dice_mean
+        return total_loss, asl_mean, dice_mean
 
 
 # ============================================================================
@@ -1034,7 +1250,7 @@ class SLDTrainer:
         warmup_lr_scheduler = LinearLR(
             optimizer,
             start_factor=0.01,
-            total_iters=warmup_epochs * len(train_loader)
+            total_iters=warmup_epochs  # scheduler.step() runs once per epoch
         )
         
         cosine_scheduler = CosineAnnealingWarmRestarts(
@@ -1047,7 +1263,7 @@ class SLDTrainer:
         scheduler = SequentialLR(
             optimizer,
             schedulers=[warmup_lr_scheduler, cosine_scheduler],
-            milestones=[warmup_epochs * len(train_loader)]
+            milestones=[warmup_epochs]
         )
 
         # Early stopping
@@ -1117,7 +1333,7 @@ class SLDTrainer:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 patience_counter = 0
-                self.best_model_state = self.model.state_dict()
+                self.best_model_state = copy.deepcopy(self.model.state_dict())
                 print("[OK] Best model saved")
             else:
                 patience_counter += 1
@@ -1425,17 +1641,6 @@ class SLDInferenceEngine:
         Returns:
             predictions: Dictionary mapping child index to predictions
         """
-        feature_matrix = self.scaler.transform(feature_matrix)
-        x = torch.FloatTensor(feature_matrix).to(self.device)
-
-        mean_probs, uncertainties = self.model.mc_predict(
-            x,
-            n_samples=self.config["mc_dropout"]["n_samples"]
-        )
-
-        mean_probs = mean_probs.cpu().numpy()
-        uncertainties = uncertainties.cpu().numpy()
-
         predictions = {}
 
         for i in range(len(feature_matrix)):
@@ -1814,6 +2019,55 @@ class TestSLDSystem(unittest.TestCase):
 
         print("[OK] Checkpoint save/load test passed")
 
+    def test_shap_attribution_shape(self):
+        """Verify SHAP feature attribution mapping (Lundberg & Lee 2017)."""
+        import sys, os
+        b_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
+        if b_dir not in sys.path:
+            sys.path.insert(0, b_dir)
+        from ai.inference_engine import get_inference_engine
+        engine = get_inference_engine()
+        test_vec = np.random.rand(64).tolist()
+        shap_explanations = engine.get_shap_explanations(test_vec)
+        self.assertIn("Dyslexia", shap_explanations)
+        self.assertIn("Dyscalculia", shap_explanations)
+        self.assertIn("Dysgraphia", shap_explanations)
+        for disorder, attributions in shap_explanations.items():
+            self.assertGreater(len(attributions), 0)
+        print("[OK] SHAP attribution shape test passed")
+
+    def test_conformal_coverage_guarantee(self):
+        """Verify Inductive Conformal Prediction intervals (Angelopoulos & Bates 2021)."""
+        import sys, os
+        b_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
+        if b_dir not in sys.path:
+            sys.path.insert(0, b_dir)
+        from ai.inference_engine import ConformalWrapper
+        wrapper = ConformalWrapper(confidence_level=0.90)
+        test_probs = np.array([0.75, 0.40, 0.20])
+        intervals = wrapper.predict_with_interval(test_probs)
+        self.assertIn("Dyslexia", intervals)
+        for disorder, bounds in intervals.items():
+            self.assertLessEqual(bounds["lower_bound"], bounds["point_estimate"])
+            self.assertGreaterEqual(bounds["upper_bound"], bounds["point_estimate"])
+            self.assertEqual(bounds["coverage_guarantee"], 0.90)
+        print("[OK] Conformal coverage guarantee test passed")
+
+    def test_fairness_parity_difference(self):
+        """Verify Demographic Parity Difference fairness evaluation (Barocas et al. 2019)."""
+        import sys, os
+        b_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
+        if b_dir not in sys.path:
+            sys.path.insert(0, b_dir)
+        from ai.fairness_analyzer import run_synthetic_fairness_audit
+        audit_results = run_synthetic_fairness_audit(n_samples=200)
+        self.assertIn("demographic_parity_difference", audit_results)
+        self.assertIn("fairness_status", audit_results)
+        self.assertLessEqual(audit_results["demographic_parity_difference"], 0.20)
+        print("[OK] Fairness parity difference test passed")
+
+
+
 
 # ============================================================================
 # SECTION 10: MAIN EXECUTION
@@ -2048,6 +2302,121 @@ def main():
     print("="*80)
 
     threshold_optimizer = trainer.calibrate_thresholds(val_loader)
+
+    # ========================================================================
+    # STEP 6.5: Temperature Calibration & Artifact Saving (ALL 6 ARTIFACTS)
+    # ========================================================================
+    print("\n" + "="*80)
+    print("STEP 6.5: TEMPERATURE SCALING & SAVING 6 PRODUCTION ARTIFACTS")
+    print("="*80)
+
+    # 1. Fit Temperature Scaler on Validation Set
+    val_logits_list = []
+    val_targets_list = []
+    model.eval()
+    with torch.no_grad():
+        for x, y in val_loader:
+            x = x.to(device)
+            logits = model(x)
+            val_logits_list.append(logits)
+            val_targets_list.append(y.to(device))
+    val_logits = torch.cat(val_logits_list, dim=0).float()
+    val_targets = torch.cat(val_targets_list, dim=0).float()
+
+    uncalib_probs = torch.sigmoid(val_logits).cpu().numpy()
+    val_targets_np = val_targets.cpu().numpy()
+    ece_before = compute_ece(uncalib_probs, val_targets_np)
+
+    temp_scaler = TemperatureScaler()
+    t_opt = temp_scaler.fit(val_logits, val_targets)
+
+    calib_probs = torch.sigmoid(temp_scaler(val_logits)).detach().cpu().numpy()
+    ece_after = compute_ece(calib_probs, val_targets_np)
+
+    print(f"[CALIBRATION] ECE Before: {ece_before:.4f} | ECE After: {ece_after:.4f} | T*: {t_opt:.4f}")
+    if ece_after >= ece_before:
+        print("[CALIBRATION] Temperature scaling did not reduce ECE; keeping T = 1.0")
+        t_opt, ece_after = 1.0, ece_before
+
+    # Thresholds must be fitted on the same probabilities that are served (tempered)
+    threshold_optimizer = YoudensJThresholdOptimizer(CONFIG)
+    threshold_optimizer.fit(val_targets_np, torch.sigmoid(val_logits / t_opt).cpu().numpy())
+
+    # Artifact Directory: backend/models/
+    models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend", "models")
+    os.makedirs(models_dir, exist_ok=True)
+    ai_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend", "ai")
+    os.makedirs(ai_dir, exist_ok=True)
+
+    # Artifact 1: best_model.pt
+    model_state = model.state_dict()
+    opt_thresholds = [
+        float(threshold_optimizer.optimal_thresholds.get(0, 0.5)),
+        float(threshold_optimizer.optimal_thresholds.get(1, 0.5)),
+        float(threshold_optimizer.optimal_thresholds.get(2, 0.5))
+    ]
+    ckpt_payload = {
+        "model_state_dict": model_state,
+        "optimal_thresholds": opt_thresholds,
+        "config": CONFIG,
+        "temperature": t_opt,
+        "feature_scaler": {"mean": train_dataset.scaler.mean_.tolist(), "scale": train_dataset.scaler.scale_.tolist()},
+        "saved_at": datetime.now().isoformat()
+    }
+    torch.save(ckpt_payload, os.path.join(models_dir, "best_model.pt"))
+    torch.save(ckpt_payload, os.path.join(ai_dir, "best_model.pt"))
+    torch.save(ckpt_payload, os.path.join(os.path.dirname(os.path.abspath(__file__)), "best_model.pt"))
+    print(f"[ARTIFACT 1/6] Saved best_model.pt")
+
+    # Artifact 2: feature_scaler.json
+    scaler_payload = {
+        "mean": train_dataset.scaler.mean_.tolist(),
+        "scale": train_dataset.scaler.scale_.tolist(),
+        "var": train_dataset.scaler.var_.tolist() if hasattr(train_dataset.scaler, "var_") else [],
+        "n_samples_seen": int(train_dataset.scaler.n_samples_seen_)
+    }
+    with open(os.path.join(models_dir, "feature_scaler.json"), "w") as f:
+        json.dump(scaler_payload, f, indent=2)
+    print(f"[ARTIFACT 2/6] Saved feature_scaler.json")
+
+    # Artifact 3: thresholds.json
+    thresholds_payload = {
+        "dyslexia": opt_thresholds[0],
+        "dyscalculia": opt_thresholds[1],
+        "dysgraphia": opt_thresholds[2],
+        "thresholds_list": opt_thresholds,
+        "method": "Youden's J Statistic"
+    }
+    with open(os.path.join(models_dir, "thresholds.json"), "w") as f:
+        json.dump(thresholds_payload, f, indent=2)
+    print(f"[ARTIFACT 3/6] Saved thresholds.json")
+
+    # Artifact 4: temperature.json
+    save_temperature(t_opt, ece_before, ece_after, os.path.join(models_dir, "temperature.json"))
+    print(f"[ARTIFACT 4/6] Saved temperature.json")
+
+    # Artifact 5: shap_background.npy (50 representative samples from validation set)
+    val_raw_features = train_dataset.scaler.transform(X_val[:50])
+    np.save(os.path.join(models_dir, "shap_background.npy"), val_raw_features)
+    np.save(os.path.join(ai_dir, "shap_background.npy"), val_raw_features)
+    print(f"[ARTIFACT 5/6] Saved shap_background.npy ({val_raw_features.shape})")
+
+    # Artifact 6: training_metadata.json
+    meta_payload = {
+        "model_version": "2.0 - PyTorch FT-Transformer",
+        "saved_at": datetime.now().isoformat(),
+        "n_train_samples": len(X_train),
+        "n_val_samples": len(X_val),
+        "n_test_samples": len(X_test),
+        "temperature_t_opt": t_opt,
+        "ece_before": ece_before,
+        "ece_after": ece_after,
+        "thresholds": opt_thresholds,
+        "config": CONFIG
+    }
+    with open(os.path.join(models_dir, "training_metadata.json"), "w") as f:
+        json.dump(meta_payload, f, indent=2)
+    print(f"[ARTIFACT 6/6] Saved training_metadata.json")
 
     # ========================================================================
     # STEP 7: Test Set Evaluation

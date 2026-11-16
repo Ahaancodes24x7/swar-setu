@@ -1,0 +1,121 @@
+{
+  "model_version": "2.0 - PyTorch FT-Transformer",
+  "saved_at": "2026-08-11T10:21:59.326814",
+  "n_train_samples": 800,
+  "n_val_samples": 200,
+  "n_test_samples": 200,
+  "temperature_t_opt": 1.3732677698135376,
+  "ece_before": 0.2738916747272014,
+  "ece_after": 0.3160770251353582,
+  "thresholds": [
+    0.9079586267471313,
+    0.9164590239524841,
+    0.9260640144348145
+  ],
+  "config": {
+    "data": {
+      "n_train_samples": 800,
+      "n_val_samples": 200,
+      "n_test_samples": 200,
+      "n_features": 64,
+      "feature_groups": {
+        "dyslexia": [
+          0,
+          16
+        ],
+        "dyscalculia": [
+          16,
+          32
+        ],
+        "dysgraphia": [
+          32,
+          48
+        ],
+        "behavioral": [
+          48,
+          64
+        ]
+      },
+      "positive_rate": 0.15,
+      "comorbidity_corr": 0.35,
+      "signal_strength": 0.8,
+      "effect_size": 1.2,
+      "noise_scale": 0.3
+    },
+    "model": {
+      "input_dim": 64,
+      "embedding_dim": 128,
+      "hidden_dim": 256,
+      "num_residual_blocks": 4,
+      "num_attention_heads": 4,
+      "dropout_rate": 0.3,
+      "layer_norm_eps": 1e-06
+    },
+    "loss": {
+      "gamma_pos": 0.0,
+      "gamma_neg": 4.0,
+      "clip_margin": 0.05,
+      "pos_weight": null,
+      "label_smoothing": 0.05
+    },
+    "training": {
+      "batch_size": 64,
+      "num_epochs": 150,
+      "learning_rate": 0.0003,
+      "weight_decay": 0.0001,
+      "gradient_clip_norm": 1.0,
+      "accumulation_steps": 1,
+      "early_stopping_patience": 25,
+      "early_stopping_metric": "val_loss",
+      "warmup_epochs": 10,
+      "label_smoothing": 0.05
+    },
+    "scheduler": {
+      "T_0": 50,
+      "T_mult": 2,
+      "eta_min": 1e-06
+    },
+    "mc_dropout": {
+      "n_samples": 10,
+      "keep_dropout_active": true
+    },
+    "threshold_optimization": {
+      "n_thresholds": 500,
+      "threshold_range": [
+        0.01,
+        0.99
+      ],
+      "optimization_metric": "youdens_j",
+      "sensitivity_weight": 0.7
+    },
+    "device": {
+      "device_type": "cpu",
+      "use_mixed_precision": false,
+      "seed": 42
+    },
+    "clinical_thresholds": {
+      "sensitivity": 0.85,
+      "specificity": 0.7,
+      "auc_roc": 0.8,
+      "auc_pr": 0.6,
+      "f1": 0.65
+    },
+    "evaluation": {
+      "disorder_names": [
+        "Dyslexia",
+        "Dyscalculia",
+        "Dysgraphia"
+      ],
+      "compute_per_label_metrics": true,
+      "compute_aggregate_metrics": true
+    },
+    "inference": {
+      "uncertainty_threshold": 0.2,
+      "risk_level_thresholds": {
+        "monitor": 0.3,
+        "refer": 0.6,
+        "urgent": 0.8
+      }
+    }
+  }
+}

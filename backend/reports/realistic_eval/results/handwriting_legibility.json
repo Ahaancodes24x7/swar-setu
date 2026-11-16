@@ -1,0 +1,37 @@
+{
+ "typical": {
+  "mean": 1.0,
+  "exact": 1.0,
+  "n": 15
+ },
+ "typical_touch": {
+  "mean": 1.0,
+  "exact": 1.0,
+  "n": 15
+ },
+ "typical_mouse": {
+  "mean": 1.0,
+  "exact": 1.0,
+  "n": 15
+ },
+ "tremor": {
+  "mean": 0.7,
+  "exact": 0.467,
+  "n": 15
+ },
+ "dysfluent": {
+  "mean": 1.0,
+  "exact": 1.0,
+  "n": 15
+ },
+ "spatial": {
+  "mean": 0.884,
+  "exact": 0.667,
+  "n": 15
+ },
+ "illegible": {
+  "mean": 0.789,
+  "exact": 0.467,
+  "n": 15
+ }
+}

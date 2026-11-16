@@ -1,0 +1,80 @@
+device=cuda seeds=[0, 1, 2, 3, 4] n=6000
+[deployed] checkpoint=D:\OneDrive\Desktop\swar-setu-main\backend\models\best_model.pt T=1.3733 thr=[0.908  0.9165 0.9261]
+latency {'median_ms': 587.2298999966006, 'p95_ms': 651.3918250035204}
+original generator {"Dyslexia": {"prevalence": 0.16083333333333333, "median_cohens_d": 1.4979425765627101, "lr_test_auroc": 0.9616784414472275}, "Dyscalculia": {"prevalence": 0.2125, "median_cohens_d": 1.6153000983434755, "lr_test_auroc": 0.9706340956340956}, "Dysgraphia": {"prevalence": 0.19833333333333333, "median_cohens_d": 1.6313766434207413, "lr_test_auroc": 0.9576541459957477}}
+seed 0 done in 91.8s; FT epochs {'asl': {'epochs': 27, 'train_s': 33.8, 'temperature': 1.4028980731964111}, 'bce': {'epochs': 27, 'train_s': 24.8}}
+   Logistic Regression                        macroAUROC=0.818 ext=0.799
+   Random Forest                              macroAUROC=0.809 ext=0.811
+   XGBoost                                    macroAUROC=0.804 ext=0.790
+   LightGBM                                   macroAUROC=0.810 ext=0.798
+   MLP (sklearn)                              macroAUROC=0.735 ext=0.748
+   LR + demographics                          macroAUROC=0.869 ext=0.836
+   FT-Transformer (ASL+Dice)                  macroAUROC=0.819 ext=0.813
+   FT-Transformer (ASL+Dice) + TS             macroAUROC=0.819 ext=0.813
+   FT-Transformer (BCE)                       macroAUROC=0.817 ext=0.816
+   D1 Deployed FT (as served)                 macroAUROC=0.714 ext=0.684
+   D2 Deployed FT + saved scaler              macroAUROC=0.769 ext=0.783
+   D2b Deployed FT + cohort scaler            macroAUROC=0.782 ext=0.785
+   D3 Deployed single-test (0.5 fill)         macroAUROC=0.775 ext=0.765
+   D4 Legacy *_nn_model (random weights)      macroAUROC=0.482 ext=0.488
+seed 1 done in 85.3s; FT epochs {'asl': {'epochs': 26, 'train_s': 27.5, 'temperature': 1.4196916818618774}, 'bce': {'epochs': 27, 'train_s': 25.9}}
+   Logistic Regression                        macroAUROC=0.812 ext=0.798
+   Random Forest                              macroAUROC=0.808 ext=0.808
+   XGBoost                                    macroAUROC=0.803 ext=0.780
+   LightGBM                                   macroAUROC=0.811 ext=0.787
+   MLP (sklearn)                              macroAUROC=0.748 ext=0.731
+   LR + demographics                          macroAUROC=0.854 ext=0.831
+   FT-Transformer (ASL+Dice)                  macroAUROC=0.785 ext=0.788
+   FT-Transformer (ASL+Dice) + TS             macroAUROC=0.785 ext=0.788
+   FT-Transformer (BCE)                       macroAUROC=0.815 ext=0.818
+   D1 Deployed FT (as served)                 macroAUROC=0.702 ext=0.663
+   D2 Deployed FT + saved scaler              macroAUROC=0.748 ext=0.766
+   D2b Deployed FT + cohort scaler            macroAUROC=0.764 ext=0.774
+   D3 Deployed single-test (0.5 fill)         macroAUROC=0.775 ext=0.757
+   D4 Legacy *_nn_model (random weights)      macroAUROC=0.473 ext=0.500
+seed 2 done in 81.8s; FT epochs {'asl': {'epochs': 27, 'train_s': 29.9, 'temperature': 1.3941706418991089}, 'bce': {'epochs': 27, 'train_s': 22.5}}
+   Logistic Regression                        macroAUROC=0.821 ext=0.799
+   Random Forest                              macroAUROC=0.824 ext=0.824
+   XGBoost                                    macroAUROC=0.803 ext=0.803
+   LightGBM                                   macroAUROC=0.806 ext=0.802
+   MLP (sklearn)                              macroAUROC=0.750 ext=0.732
+   LR + demographics                          macroAUROC=0.861 ext=0.834
+   FT-Transformer (ASL+Dice)                  macroAUROC=0.824 ext=0.815
+   FT-Transformer (ASL+Dice) + TS             macroAUROC=0.824 ext=0.815
+   FT-Transformer (BCE)                       macroAUROC=0.823 ext=0.821
+   D1 Deployed FT (as served)                 macroAUROC=0.678 ext=0.675
+   D2 Deployed FT + saved scaler              macroAUROC=0.753 ext=0.774
+   D2b Deployed FT + cohort scaler            macroAUROC=0.769 ext=0.782
+   D3 Deployed single-test (0.5 fill)         macroAUROC=0.778 ext=0.765
+   D4 Legacy *_nn_model (random weights)      macroAUROC=0.455 ext=0.472
+seed 3 done in 87.4s; FT epochs {'asl': {'epochs': 27, 'train_s': 31.3, 'temperature': 1.3915096521377563}, 'bce': {'epochs': 27, 'train_s': 23.7}}
+   Logistic Regression                        macroAUROC=0.796 ext=0.811
+   Random Forest                              macroAUROC=0.802 ext=0.817
+   XGBoost                                    macroAUROC=0.778 ext=0.782
+   LightGBM                                   macroAUROC=0.783 ext=0.792
+   MLP (sklearn)                              macroAUROC=0.731 ext=0.739
+   LR + demographics                          macroAUROC=0.835 ext=0.838
+   FT-Transformer (ASL+Dice)                  macroAUROC=0.804 ext=0.813
+   FT-Transformer (ASL+Dice) + TS             macroAUROC=0.804 ext=0.813
+   FT-Transformer (BCE)                       macroAUROC=0.804 ext=0.815
+   D1 Deployed FT (as served)                 macroAUROC=0.680 ext=0.677
+   D2 Deployed FT + saved scaler              macroAUROC=0.740 ext=0.777
+   D2b Deployed FT + cohort scaler            macroAUROC=0.758 ext=0.781
+   D3 Deployed single-test (0.5 fill)         macroAUROC=0.748 ext=0.764
+   D4 Legacy *_nn_model (random weights)      macroAUROC=0.494 ext=0.501
+seed 4 done in 90.8s; FT epochs {'asl': {'epochs': 27, 'train_s': 30.7, 'temperature': 1.395707607269287}, 'bce': {'epochs': 27, 'train_s': 26.6}}
+   Logistic Regression                        macroAUROC=0.789 ext=0.814
+   Random Forest                              macroAUROC=0.804 ext=0.824
+   XGBoost                                    macroAUROC=0.790 ext=0.808
+   LightGBM                                   macroAUROC=0.788 ext=0.812
+   MLP (sklearn)                              macroAUROC=0.739 ext=0.744
+   LR + demographics                          macroAUROC=0.834 ext=0.854
+   FT-Transformer (ASL+Dice)                  macroAUROC=0.790 ext=0.820
+   FT-Transformer (ASL+Dice) + TS             macroAUROC=0.790 ext=0.820
+   FT-Transformer (BCE)                       macroAUROC=0.789 ext=0.825
+   D1 Deployed FT (as served)                 macroAUROC=0.681 ext=0.668
+   D2 Deployed FT + saved scaler              macroAUROC=0.741 ext=0.765
+   D2b Deployed FT + cohort scaler            macroAUROC=0.752 ext=0.773
+   D3 Deployed single-test (0.5 fill)         macroAUROC=0.743 ext=0.768
+   D4 Legacy *_nn_model (random weights)      macroAUROC=0.472 ext=0.501
+saved D:\OneDrive\Desktop\swar-setu-main\backend\reports\realistic_eval\results\all_results.json

@@ -1,0 +1,194 @@
+[
+ {
+  "id": "C1",
+  "title": "Serving skips the training-time feature standardisation",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "critical",
+  "evidence": "mc_dropout_predict now standardises with the stored scaler"
+ },
+ {
+  "id": "C2",
+  "title": "Checkpoint, thresholds, temperature and scaler come from different runs",
+  "scope": "legacy FT artefact",
+  "status": "OPEN",
+  "severity": "critical",
+  "evidence": "checkpoint keys ['config', 'model_state_dict']; training script now stores thresholds, temperature and scaler in the checkpoint, but the FT model has not been retrained"
+ },
+ {
+  "id": "C3a",
+  "title": "Temperature scaling kept even when it worsens ECE",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "training keeps T=1 unless ECE improves"
+ },
+ {
+  "id": "C3b",
+  "title": "Deployed temperature.json worsens calibration",
+  "scope": "legacy FT artefact",
+  "status": "OPEN",
+  "severity": "high",
+  "evidence": "ECE 0.2739 -> 0.3161 (stale until FT retrain)"
+ },
+ {
+  "id": "C4",
+  "title": "'High' risk tier unreachable (threshold * 1.1 > 1)",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "tiers are now High >= threshold, Medium >= 0.7 * threshold"
+ },
+ {
+  "id": "C5",
+  "title": "Early stopping restores the last epoch (live state_dict reference)",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "both trainers deep-copy the best weights"
+ },
+ {
+  "id": "C6",
+  "title": "Warm-up counted in batches but stepped per epoch",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "medium",
+  "evidence": "warm-up and milestone now in epochs"
+ },
+ {
+  "id": "C7",
+  "title": "Thresholds fitted on untempered probabilities but applied to tempered ones",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "thresholds are refitted on tempered validation probabilities"
+ },
+ {
+  "id": "C8",
+  "title": "'90% guaranteed' conformal intervals use hard-coded q_hat",
+  "scope": "legacy FT code",
+  "status": "OPEN",
+  "severity": "high",
+  "evidence": "legacy engine only; production uses class-conditional split conformal fitted on validation data"
+ },
+ {
+  "id": "C9",
+  "title": "Fairness status hard-coded / audit on fabricated predictions",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "/api/fairness-report now reports measured held-out subgroup error rates"
+ },
+ {
+  "id": "C10",
+  "title": "Random-weight legacy predictors exported",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "no longer exported or used; files remain for reference"
+ },
+ {
+  "id": "C11",
+  "title": "SHAP call reseeds global RNGs",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "low",
+  "evidence": "SHAP now seeds inside a forked RNG"
+ },
+ {
+  "id": "C12",
+  "title": "predict_batch standardises twice",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "medium",
+  "evidence": "single transform"
+ },
+ {
+  "id": "C13",
+  "title": "SHAP background stored in raw space",
+  "scope": "legacy FT artefact",
+  "status": "OPEN",
+  "severity": "medium",
+  "evidence": "training now saves the background in model-input space; stored file is stale until FT retrain"
+ },
+ {
+  "id": "C14",
+  "title": "Legacy training generator mis-specified (d~1.5, prevalence 16-21%)",
+  "scope": "legacy FT code",
+  "status": "OPEN",
+  "severity": "high",
+  "evidence": "still used by the legacy FT trainer; production trains on backend/screening/synthetic_cohort.py"
+ },
+ {
+  "id": "C16",
+  "title": "Unit tests fail on CUDA (non-leaf grad tensors)",
+  "scope": "legacy FT code",
+  "status": "FIXED",
+  "severity": "low",
+  "evidence": "tensors created on device"
+ },
+ {
+  "id": "C17",
+  "title": "Old benchmark thresholds every model at 0.5",
+  "scope": "historical report",
+  "status": "OPEN",
+  "severity": "medium",
+  "evidence": "reports/run_paper_experiments.py left as a record; superseded by realistic_eval/"
+ },
+ {
+  "id": "P1",
+  "title": "Single verified artefact bundle (model, normer, thresholds, conformal)",
+  "scope": "production",
+  "status": "FIXED",
+  "severity": "critical",
+  "evidence": "lightgbm-normed@20261012053455, sha256 6fd39c07715a..."
+ },
+ {
+  "id": "C15",
+  "title": "End-to-end: impaired reader must score higher risk than a strong reader",
+  "scope": "production",
+  "status": "FIXED",
+  "severity": "critical",
+  "evidence": "risk weak/mid/strong = 0.4863/0.0232/0.0037; levels High/Medium/Low"
+ },
+ {
+  "id": "P2",
+  "title": "All risk tiers reachable",
+  "scope": "production",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "observed tiers ['High', 'Low', 'Medium']"
+ },
+ {
+  "id": "P3",
+  "title": "Conformal coverage >= 0.88 for BOTH classes on held-out data",
+  "scope": "production",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "minimum class-conditional coverage 0.897 (target 0.90)"
+ },
+ {
+  "id": "P4",
+  "title": "Calibrated probabilities (held-out ECE <= 0.03)",
+  "scope": "production",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "max ECE 0.0115"
+ },
+ {
+  "id": "P5",
+  "title": "Every screening input is stored locally",
+  "scope": "production",
+  "status": "FIXED",
+  "severity": "high",
+  "evidence": "assessment ids ['a3d0708a', '21a37e97', '16379c0d']"
+ },
+ {
+  "id": "P6",
+  "title": "Explainer reports why it fell back instead of failing silently",
+  "scope": "production",
+  "status": "FIXED",
+  "severity": "medium",
+  "evidence": "source=fallback, reason=GEMINI_API_KEY not set"
+ }
+]

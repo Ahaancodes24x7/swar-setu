@@ -1,0 +1,1150 @@
+{
+ "bootstrap": {
+  "n_boot": 1000,
+  "seeds": 5,
+  "per_model": {
+   "LightGBM pipeline": {
+    "auroc": [
+     0.8576826623464593,
+     0.8462751859793022,
+     0.8693936475869606
+    ],
+    "sens": [
+     0.8561924443948563,
+     0.8364560270146059,
+     0.8761577791624782
+    ],
+    "spec": [
+     0.684500577480257,
+     0.6756252953108465,
+     0.6933219594340109
+    ],
+    "ppv": [
+     0.17801585623946312,
+     0.1678241621111564,
+     0.1880379021812823
+    ]
+   },
+   "LR + demographics": {
+    "auroc": [
+     0.8504216060974035,
+     0.8392222338797859,
+     0.8620078045290328
+    ],
+    "sens": [
+     0.86629335780142,
+     0.846994871654303,
+     0.8847675297629528
+    ],
+    "spec": [
+     0.658077815389735,
+     0.6492447249189417,
+     0.667954993134737
+    ],
+    "ppv": [
+     0.16643770660748067,
+     0.15700845202068314,
+     0.1760453977021503
+    ]
+   },
+   "Logistic regression": {
+    "auroc": [
+     0.8071275302531015,
+     0.7941031697717672,
+     0.8194452074046558
+    ],
+    "sens": [
+     0.8586108769611926,
+     0.8393344343147882,
+     0.8770329481106981
+    ],
+    "spec": [
+     0.5633438738393902,
+     0.554303078417491,
+     0.5731671651532226
+    ],
+    "ppv": [
+     0.13560338305127317,
+     0.12732346656072124,
+     0.14400320618307075
+    ]
+   },
+   "Random forest": {
+    "auroc": [
+     0.8092151061362172,
+     0.7962062746599761,
+     0.8221533554976133
+    ],
+    "sens": [
+     0.8325502065346335,
+     0.8123447101999354,
+     0.8543584965629595
+    ],
+    "spec": [
+     0.6026184090984696,
+     0.5921440319048562,
+     0.6126255877638264
+    ],
+    "ppv": [
+     0.14245027308729707,
+     0.13401836893651853,
+     0.1507136399652155
+    ]
+   },
+   "XGBoost": {
+    "auroc": [
+     0.795644607584797,
+     0.7822464297400299,
+     0.8091576447066422
+    ],
+    "sens": [
+     0.8489752879273977,
+     0.8285239021051268,
+     0.8694821373180991
+    ],
+    "spec": [
+     0.5423980407635458,
+     0.5330050973697262,
+     0.5523231343055194
+    ],
+    "ppv": [
+     0.1283883287837538,
+     0.12050910409969888,
+     0.13595248070421465
+    ]
+   },
+   "FT-Transformer (ASL+Dice)": {
+    "auroc": [
+     0.8042165916265287,
+     0.7906669373938586,
+     0.8171731604735357
+    ],
+    "sens": [
+     0.8367363637448271,
+     0.8158592015563013,
+     0.8568243929782959
+    ],
+    "spec": [
+     0.5856761847942293,
+     0.5758523011432468,
+     0.5952598450345615
+    ],
+    "ppv": [
+     0.13743228990532466,
+     0.1294636759100043,
+     0.1455698052196346
+    ]
+   },
+   "FT-Transformer (BCE)": {
+    "auroc": [
+     0.8094915617426559,
+     0.7953828374388561,
+     0.821994018968776
+    ],
+    "sens": [
+     0.8464629290503478,
+     0.8259355440384275,
+     0.8665561971406548
+    ],
+    "spec": [
+     0.5865464759807152,
+     0.5772836970283933,
+     0.5959119837498116
+    ],
+    "ppv": [
+     0.14082669073376666,
+     0.13238533218610576,
+     0.14921282172018913
+    ]
+   }
+  },
+  "lightgbm_minus_model_auroc": {
+   "LR + demographics": {
+    "diff": [
+     0.007261056249055736,
+     0.0023240429047898135,
+     0.012121354742943976
+    ],
+    "p_le_0": 0.001
+   },
+   "Logistic regression": {
+    "diff": [
+     0.0505551320933579,
+     0.04289661981431899,
+     0.058787279206107046
+    ],
+    "p_le_0": 0.0
+   },
+   "Random forest": {
+    "diff": [
+     0.048467556210242034,
+     0.04011235369880227,
+     0.05668812991495998
+    ],
+    "p_le_0": 0.0
+   },
+   "XGBoost": {
+    "diff": [
+     0.06203805476166215,
+     0.05343362086974378,
+     0.07076180932903448
+    ],
+    "p_le_0": 0.0
+   },
+   "FT-Transformer (ASL+Dice)": {
+    "diff": [
+     0.053466070719930495,
+     0.04473822701764238,
+     0.06256937788702066
+    ],
+    "p_le_0": 0.0
+   },
+   "FT-Transformer (BCE)": {
+    "diff": [
+     0.04819110060380336,
+     0.039577951656647486,
+     0.05681248068360066
+    ],
+    "p_le_0": 0.0
+   }
+  }
+ },
+ "sensitivity": {
+  "rows": [
+   {
+    "factor": "signal strength (loading scale)",
+    "level": "0.70",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8119450644408605,
+     0.007136938205929787
+    ],
+    "LR + demographics": [
+     0.8109186774912747,
+     0.010956141371340003
+    ],
+    "Logistic regression": [
+     0.7402789438913794,
+     0.007489270656079542
+    ],
+    "Random forest": [
+     0.7376103831135016,
+     0.005666868246865435
+    ],
+    "XGBoost": [
+     0.7161904208778016,
+     0.00419995208221686
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7331681253884229,
+     0.018196691203832577
+    ],
+    "FT-Transformer (BCE)": [
+     0.7395140219067061,
+     0.011158360856596477
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "Logistic regression",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "signal strength (loading scale)",
+    "level": "0.85",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8349798395158946,
+     0.00981148869055929
+    ],
+    "LR + demographics": [
+     0.8269909323387483,
+     0.011905182087682837
+    ],
+    "Logistic regression": [
+     0.7718000623666335,
+     0.008956196107527037
+    ],
+    "Random forest": [
+     0.7713879046350726,
+     0.010023982226521514
+    ],
+    "XGBoost": [
+     0.7509776833110663,
+     0.006749840130659181
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7641747319691697,
+     0.014167708427501114
+    ],
+    "FT-Transformer (BCE)": [
+     0.7719135552671812,
+     0.008711189679926354
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Logistic regression",
+     "Random forest",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "signal strength (loading scale)",
+    "level": "1.00",
+    "baseline": true,
+    "LightGBM pipeline": [
+     0.8503437448675578,
+     0.008821953144456315
+    ],
+    "LR + demographics": [
+     0.8394433044015145,
+     0.01234314998723124
+    ],
+    "Logistic regression": [
+     0.7963680193962664,
+     0.010247843523582255
+    ],
+    "Random forest": [
+     0.7970713865727242,
+     0.008091149126609914
+    ],
+    "XGBoost": [
+     0.783239994967051,
+     0.009285060517237731
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7924430425823458,
+     0.012891025494797372
+    ],
+    "FT-Transformer (BCE)": [
+     0.8004674821387697,
+     0.006084611794078908
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "signal strength (loading scale)",
+    "level": "1.15",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8610874290005494,
+     0.007045701281197522
+    ],
+    "LR + demographics": [
+     0.853478844497793,
+     0.010238153691154507
+    ],
+    "Logistic regression": [
+     0.8205094638021881,
+     0.007170118881259062
+    ],
+    "Random forest": [
+     0.8228287063661243,
+     0.007136575353725518
+    ],
+    "XGBoost": [
+     0.8170051462813709,
+     0.007446293312239032
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.8191995031476912,
+     0.008390790942618343
+    ],
+    "FT-Transformer (BCE)": [
+     0.8250889923111876,
+     0.002335981740507701
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "missed diagnoses (label FN rate)",
+    "level": "0%",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8595014424840617,
+     0.009615821677580683
+    ],
+    "LR + demographics": [
+     0.8509251113855513,
+     0.011027909678112374
+    ],
+    "Logistic regression": [
+     0.8116689355386636,
+     0.012999858570723465
+    ],
+    "Random forest": [
+     0.808970122386451,
+     0.01525049048421102
+    ],
+    "XGBoost": [
+     0.8006237196296769,
+     0.012905102225951554
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.8052800865695954,
+     0.014807944374977667
+    ],
+    "FT-Transformer (BCE)": [
+     0.8156786752884563,
+     0.01856006218095899
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Logistic regression",
+     "Random forest",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "missed diagnoses (label FN rate)",
+    "level": "10%",
+    "baseline": true,
+    "LightGBM pipeline": [
+     0.8503437448675578,
+     0.008821953144456315
+    ],
+    "LR + demographics": [
+     0.8394433044015145,
+     0.01234314998723124
+    ],
+    "Logistic regression": [
+     0.7963680193962664,
+     0.010247843523582255
+    ],
+    "Random forest": [
+     0.7970713865727242,
+     0.008091149126609914
+    ],
+    "XGBoost": [
+     0.783239994967051,
+     0.009285060517237731
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7924430425823458,
+     0.012891025494797372
+    ],
+    "FT-Transformer (BCE)": [
+     0.8004674821387697,
+     0.006084611794078908
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "missed diagnoses (label FN rate)",
+    "level": "20%",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8356516486521283,
+     0.014133580460152183
+    ],
+    "LR + demographics": [
+     0.8280036127994382,
+     0.01390959609033849
+    ],
+    "Logistic regression": [
+     0.7872861472674243,
+     0.011557314288864676
+    ],
+    "Random forest": [
+     0.7891367219778594,
+     0.014349721114537115
+    ],
+    "XGBoost": [
+     0.7747039045718824,
+     0.011801971997459049
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7791929600853602,
+     0.020104892338759634
+    ],
+    "FT-Transformer (BCE)": [
+     0.7821415679995485,
+     0.01987001265145872
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (BCE)",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "diagnostic reliability r",
+    "level": "0.80",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8151373074418319,
+     0.008668012542860955
+    ],
+    "LR + demographics": [
+     0.8031120721489658,
+     0.011640964339808378
+    ],
+    "Logistic regression": [
+     0.7660087743428842,
+     0.005625218630445403
+    ],
+    "Random forest": [
+     0.7645289010595547,
+     0.012613506551389738
+    ],
+    "XGBoost": [
+     0.7415450490063186,
+     0.0031953222756252743
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7530750398656139,
+     0.013156021158362615
+    ],
+    "FT-Transformer (BCE)": [
+     0.7737766703222347,
+     0.014375840727905048
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Logistic regression",
+     "Random forest",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "diagnostic reliability r",
+    "level": "0.90",
+    "baseline": true,
+    "LightGBM pipeline": [
+     0.8503437448675578,
+     0.008821953144456315
+    ],
+    "LR + demographics": [
+     0.8394433044015145,
+     0.01234314998723124
+    ],
+    "Logistic regression": [
+     0.7963680193962664,
+     0.010247843523582255
+    ],
+    "Random forest": [
+     0.7970713865727242,
+     0.008091149126609914
+    ],
+    "XGBoost": [
+     0.783239994967051,
+     0.009285060517237731
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7924430425823458,
+     0.012891025494797372
+    ],
+    "FT-Transformer (BCE)": [
+     0.8004674821387697,
+     0.006084611794078908
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "diagnostic reliability r",
+    "level": "0.97",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8567262066637645,
+     0.0180639913261187
+    ],
+    "LR + demographics": [
+     0.85368110390253,
+     0.015214076719137638
+    ],
+    "Logistic regression": [
+     0.8122138822818447,
+     0.010807441496624687
+    ],
+    "Random forest": [
+     0.8039891663925331,
+     0.01914144929109194
+    ],
+    "XGBoost": [
+     0.8033136028651705,
+     0.01695896941333186
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.8043066737460413,
+     0.015992152672446663
+    ],
+    "FT-Transformer (BCE)": [
+     0.8108536174997628,
+     0.022287543206083307
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "Logistic regression",
+     "FT-Transformer (BCE)",
+     "FT-Transformer (ASL+Dice)",
+     "Random forest",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "missing items",
+    "level": "0%",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.856197998448383,
+     0.0052880201235325705
+    ],
+    "LR + demographics": [
+     0.8533335909738904,
+     0.012406053604744506
+    ],
+    "Logistic regression": [
+     0.814891476586333,
+     0.01145824845366704
+    ],
+    "Random forest": [
+     0.8070354604882256,
+     0.0038698183860069045
+    ],
+    "XGBoost": [
+     0.7915979443725815,
+     0.00794243823480732
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.8126676433788712,
+     0.010029242014658218
+    ],
+    "FT-Transformer (BCE)": [
+     0.8184591589348837,
+     0.0036052978156019995
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "Random forest",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "missing items",
+    "level": "8%",
+    "baseline": true,
+    "LightGBM pipeline": [
+     0.8503437448675578,
+     0.008821953144456315
+    ],
+    "LR + demographics": [
+     0.8394433044015145,
+     0.01234314998723124
+    ],
+    "Logistic regression": [
+     0.7963680193962664,
+     0.010247843523582255
+    ],
+    "Random forest": [
+     0.7970713865727242,
+     0.008091149126609914
+    ],
+    "XGBoost": [
+     0.783239994967051,
+     0.009285060517237731
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7924430425823458,
+     0.012891025494797372
+    ],
+    "FT-Transformer (BCE)": [
+     0.8004674821387697,
+     0.006084611794078908
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "missing items",
+    "level": "20%",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8396067358893623,
+     0.004606012195095734
+    ],
+    "LR + demographics": [
+     0.8280810333002765,
+     0.010348997403882594
+    ],
+    "Logistic regression": [
+     0.7808255057078995,
+     0.007287597682127957
+    ],
+    "Random forest": [
+     0.783014740557066,
+     0.009219774155362436
+    ],
+    "XGBoost": [
+     0.771763234628463,
+     0.009255416705643822
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7787199926282832,
+     0.009491197582208689
+    ],
+    "FT-Transformer (BCE)": [
+     0.785841126901153,
+     0.0033535413773313006
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "home-language shift (SD)",
+    "level": "0",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.847778546798437,
+     0.005617630196243312
+    ],
+    "LR + demographics": [
+     0.8395586195208441,
+     0.011939961526731427
+    ],
+    "Logistic regression": [
+     0.797030469812387,
+     0.010407403038490571
+    ],
+    "Random forest": [
+     0.7994014904268817,
+     0.005725349205913686
+    ],
+    "XGBoost": [
+     0.785951491309631,
+     0.009479961010223237
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.792214484598098,
+     0.01284092973036513
+    ],
+    "FT-Transformer (BCE)": [
+     0.7991876036811005,
+     0.00671294057784406
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "Random forest",
+     "FT-Transformer (BCE)",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "home-language shift (SD)",
+    "level": "-0.35",
+    "baseline": true,
+    "LightGBM pipeline": [
+     0.8503437448675578,
+     0.008821953144456315
+    ],
+    "LR + demographics": [
+     0.8394433044015145,
+     0.01234314998723124
+    ],
+    "Logistic regression": [
+     0.7963680193962664,
+     0.010247843523582255
+    ],
+    "Random forest": [
+     0.7970713865727242,
+     0.008091149126609914
+    ],
+    "XGBoost": [
+     0.783239994967051,
+     0.009285060517237731
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7924430425823458,
+     0.012891025494797372
+    ],
+    "FT-Transformer (BCE)": [
+     0.8004674821387697,
+     0.006084611794078908
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "home-language shift (SD)",
+    "level": "-0.70",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8501426379523197,
+     0.008179346704484386
+    ],
+    "LR + demographics": [
+     0.8404849526111896,
+     0.0115495643273943
+    ],
+    "Logistic regression": [
+     0.7932724776724543,
+     0.009922674372502544
+    ],
+    "Random forest": [
+     0.7951221837298266,
+     0.005730861559631927
+    ],
+    "XGBoost": [
+     0.7816530402386878,
+     0.007084058921490767
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7875790685387697,
+     0.011854523329794074
+    ],
+    "FT-Transformer (BCE)": [
+     0.7997388902706161,
+     0.00301155056127641
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "age slope (SD/year)",
+    "level": "0",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8529522270613987,
+     0.005680514068114411
+    ],
+    "LR + demographics": [
+     0.8447228946839217,
+     0.010335553603129422
+    ],
+    "Logistic regression": [
+     0.8462911387027264,
+     0.009376822139701393
+    ],
+    "Random forest": [
+     0.8515717326203718,
+     0.001766715551047593
+    ],
+    "XGBoost": [
+     0.8390176604262177,
+     0.005483094924966106
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.8408516157161222,
+     0.02281897301127658
+    ],
+    "FT-Transformer (BCE)": [
+     0.8538926601101949,
+     0.007688181707237872
+    ],
+    "ranking": [
+     "FT-Transformer (BCE)",
+     "LightGBM pipeline",
+     "Random forest",
+     "Logistic regression",
+     "LR + demographics",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "age slope (SD/year)",
+    "level": "0.25",
+    "baseline": true,
+    "LightGBM pipeline": [
+     0.8503437448675578,
+     0.008821953144456315
+    ],
+    "LR + demographics": [
+     0.8394433044015145,
+     0.01234314998723124
+    ],
+    "Logistic regression": [
+     0.7963680193962664,
+     0.010247843523582255
+    ],
+    "Random forest": [
+     0.7970713865727242,
+     0.008091149126609914
+    ],
+    "XGBoost": [
+     0.783239994967051,
+     0.009285060517237731
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7924430425823458,
+     0.012891025494797372
+    ],
+    "FT-Transformer (BCE)": [
+     0.8004674821387697,
+     0.006084611794078908
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "age slope (SD/year)",
+    "level": "0.50",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.842719553975266,
+     0.005612918162681791
+    ],
+    "LR + demographics": [
+     0.832411235490837,
+     0.010402535565436835
+    ],
+    "Logistic regression": [
+     0.7689500478174307,
+     0.006965468258631442
+    ],
+    "Random forest": [
+     0.7745982962017428,
+     0.003430465710412267
+    ],
+    "XGBoost": [
+     0.7515726929887596,
+     0.009283121807838884
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7677146162389752,
+     0.0038405815165741173
+    ],
+    "FT-Transformer (BCE)": [
+     0.7677292118749593,
+     0.0026493282899635174
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (BCE)",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "prevalence",
+    "level": "x0.5",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8103464455922221,
+     0.03506439837075847
+    ],
+    "LR + demographics": [
+     0.7936966076218549,
+     0.03436047966131115
+    ],
+    "Logistic regression": [
+     0.7650960940892536,
+     0.01994688680122429
+    ],
+    "Random forest": [
+     0.7796911923750848,
+     0.03529419104445568
+    ],
+    "XGBoost": [
+     0.7425968311356322,
+     0.012578664004836307
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7850842985035652,
+     0.028753748083909885
+    ],
+    "FT-Transformer (BCE)": [
+     0.793993535527639,
+     0.02718038089018307
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "FT-Transformer (BCE)",
+     "LR + demographics",
+     "FT-Transformer (ASL+Dice)",
+     "Random forest",
+     "Logistic regression",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "prevalence",
+    "level": "x1",
+    "baseline": true,
+    "LightGBM pipeline": [
+     0.8503437448675578,
+     0.008821953144456315
+    ],
+    "LR + demographics": [
+     0.8394433044015145,
+     0.01234314998723124
+    ],
+    "Logistic regression": [
+     0.7963680193962664,
+     0.010247843523582255
+    ],
+    "Random forest": [
+     0.7970713865727242,
+     0.008091149126609914
+    ],
+    "XGBoost": [
+     0.783239994967051,
+     0.009285060517237731
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7924430425823458,
+     0.012891025494797372
+    ],
+    "FT-Transformer (BCE)": [
+     0.8004674821387697,
+     0.006084611794078908
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "FT-Transformer (BCE)",
+     "Random forest",
+     "Logistic regression",
+     "FT-Transformer (ASL+Dice)",
+     "XGBoost"
+    ]
+   },
+   {
+    "factor": "prevalence",
+    "level": "x1.5",
+    "baseline": false,
+    "LightGBM pipeline": [
+     0.8574332562335444,
+     0.016192118879945473
+    ],
+    "LR + demographics": [
+     0.8559747939119787,
+     0.013630650126166774
+    ],
+    "Logistic regression": [
+     0.8055497899140018,
+     0.013987763014234506
+    ],
+    "Random forest": [
+     0.792070225795281,
+     0.009497612504642126
+    ],
+    "XGBoost": [
+     0.7915580421823463,
+     0.011490346110382754
+    ],
+    "FT-Transformer (ASL+Dice)": [
+     0.7947567734732726,
+     0.012072709849540612
+    ],
+    "FT-Transformer (BCE)": [
+     0.8021276567258476,
+     0.012060074967585521
+    ],
+    "ranking": [
+     "LightGBM pipeline",
+     "LR + demographics",
+     "Logistic regression",
+     "FT-Transformer (BCE)",
+     "FT-Transformer (ASL+Dice)",
+     "Random forest",
+     "XGBoost"
+    ]
+   }
+  ],
+  "summary": {
+   "configs": 22,
+   "lightgbm_best_or_within_0.005": 22,
+   "lightgbm_beats_ft_asl": 22,
+   "lightgbm_beats_ft_bce": 21,
+   "lr_demog_beats_lr": 21,
+   "min_kendall_tau_vs_baseline_ranking": 0.6190476190476191,
+   "mean_kendall_tau_vs_baseline_ranking": 0.8917748917748919
+  }
+ },
+ "runtime_s": 6396.4
+}

@@ -133,3 +133,44 @@ The model features research-backed innovations including **FT-Transformer blocks
 ## 8. Conclusion
 
 The **SwarSetu Unified SLD Screening Predictor** meets all clinical readiness thresholds (Sensitivity > 95%, Specificity > 95%, Macro F1 > 0.98) and is fully integrated into the backend pipeline for automated risk assessment and explainable reporting.
+
+---
+
+---
+
+---
+
+## Post-Implementation Benchmark Results (Auto-Generated)
+
+**Attention verification:** WORKING (cross-group interaction detected)
+
+**CNN training status:** ARCHITECTURE READY (Active when image tensor provided, Fallback when None)
+
+**BiLSTM training status:** ARCHITECTURE READY (Active when sequence tensor provided, Fallback when None)
+
+### Table II: Comparative Model Performance (Synthetic Benchmark, n=1200)
+
+| Model | AUC-ROC | AUC-PR | F1-Macro | Sensitivity | Specificity |
+|-------|---------|--------|----------|-------------|-------------|
+| Logistic Regression | 0.9624 | 0.8709 | 0.7862 | 0.7992 | 0.9482 |
+| Random Forest | 0.9669 | 0.8986 | 0.7466 | 0.6287 | 0.9896 |
+| XGBoost | 0.9648 | 0.8780 | 0.7702 | 0.7285 | 0.9670 |
+| Simple MLP | 0.9521 | 0.8649 | 0.8123 | 0.8009 | 0.9627 |
+| FT-Transformer† (Proposed) | 0.9661 | 0.8912 | 0.7818 | 0.9301 | 0.9010 |
+
+### Loss Function Ablation
+
+| Loss Function | Val AUC | Val F1 | Val Sens | Conv. Epoch |
+|---------------|---------|--------|----------|-------------|
+| BCE only | 0.9652 | 0.7805 | 0.8060 | 3 |
+| BCE + pos_weight | 0.9635 | 0.7754 | 0.9316 | 3 |
+| ASL only (gamma-=4) | 0.9673 | 0.7440 | 0.9410 | 3 |
+| ASL + Dice (Proposed) | 0.9672 | 0.7501 | 0.9306 | 3 |
+
+### Figures
+
+- `figures/fig1_architecture.png` — System architecture
+- `figures/fig2_training_curves.png` — Training convergence
+- `figures/fig3_roc_curves.png` — Per-disorder ROC curves
+- `figures/fig4_shap_importance.png` — Gradient feature importance
+- `figures/fig5_confusion_matrices.png` — Confusion matrices

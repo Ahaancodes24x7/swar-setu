@@ -1,0 +1,376 @@
+{
+  "disclaimer": "PIPELINE VALIDATION ON SYNTHETIC DATA \u2014 NOT REAL-WORLD PERFORMANCE",
+  "benchmark_config": {
+    "n_samples": 1200,
+    "train_split": 800,
+    "val_split": 200,
+    "test_split": 200,
+    "seed": 42,
+    "prevalence": 0.15,
+    "cohens_d": 1.2
+  },
+  "attention_tokens": {
+    "S": 4,
+    "interpretation": "Group-level attention over 4 cognitive domain feature groups (16-D each)",
+    "groups": [
+      "Dyslexia [0:16]",
+      "Dyscalculia [16:32]",
+      "Dysgraphia [32:48]",
+      "Behavioural [48:64]"
+    ]
+  },
+  "results": [
+    {
+      "AUC-ROC": 0.9623615314068387,
+      "AUC-PR": 0.8709440338521958,
+      "F1-Mac": 0.7862478551318574,
+      "Sens.": 0.7992290933467404,
+      "Spec.": 0.9481699646578816,
+      "Balanced-Acc": 0.8736995290023111,
+      "Hamming-Loss": 0.07666666666666666,
+      "FitTime": 0.027,
+      "per_label": {
+        "Dyslexia": {
+          "Accuracy": 0.935,
+          "Precision": 0.75,
+          "Recall": 0.7777777777777778,
+          "F1": 0.7636363636363637,
+          "ROC-AUC": 0.956540355384286,
+          "PR-AUC": 0.8172604566632383,
+          "ConfusionMatrix": [
+            [
+              166,
+              7
+            ],
+            [
+              6,
+              21
+            ]
+          ]
+        },
+        "Dyscalculia": {
+          "Accuracy": 0.925,
+          "Precision": 0.8363636363636363,
+          "Recall": 0.8846153846153846,
+          "F1": 0.8598130841121495,
+          "ROC-AUC": 0.9688149688149688,
+          "PR-AUC": 0.936598573403277,
+          "ConfusionMatrix": [
+            [
+              139,
+              9
+            ],
+            [
+              6,
+              46
+            ]
+          ]
+        },
+        "Dysgraphia": {
+          "Accuracy": 0.91,
+          "Precision": 0.7352941176470589,
+          "Recall": 0.7352941176470589,
+          "F1": 0.7352941176470589,
+          "ROC-AUC": 0.9617292700212615,
+          "PR-AUC": 0.8589730714900718,
+          "ConfusionMatrix": [
+            [
+              157,
+              9
+            ],
+            [
+              9,
+              25
+            ]
+          ]
+        }
+      },
+      "Model": "Logistic Regression"
+    },
+    {
+      "AUC-ROC": 0.9669316864960199,
+      "AUC-PR": 0.8985599057944152,
+      "F1-Mac": 0.7466241560390098,
+      "Sens.": 0.628721859114016,
+      "Spec.": 0.9896338988197754,
+      "Balanced-Acc": 0.8091778789668956,
+      "Hamming-Loss": 0.07333333333333333,
+      "FitTime": 0.252,
+      "per_label": {
+        "Dyslexia": {
+          "Accuracy": 0.925,
+          "Precision": 0.875,
+          "Recall": 0.5185185185185185,
+          "F1": 0.6511627906976745,
+          "ROC-AUC": 0.9646756583172768,
+          "PR-AUC": 0.863626874709311,
+          "ConfusionMatrix": [
+            [
+              171,
+              2
+            ],
+            [
+              13,
+              14
+            ]
+          ]
+        },
+        "Dyscalculia": {
+          "Accuracy": 0.925,
+          "Precision": 0.9512195121951219,
+          "Recall": 0.75,
+          "F1": 0.8387096774193549,
+          "ROC-AUC": 0.9671257796257795,
+          "PR-AUC": 0.9352807683816965,
+          "ConfusionMatrix": [
+            [
+              146,
+              2
+            ],
+            [
+              13,
+              39
+            ]
+          ]
+        },
+        "Dysgraphia": {
+          "Accuracy": 0.93,
+          "Precision": 0.9545454545454546,
+          "Recall": 0.6176470588235294,
+          "F1": 0.75,
+          "ROC-AUC": 0.9689936215450036,
+          "PR-AUC": 0.8967720742922385,
+          "ConfusionMatrix": [
+            [
+              165,
+              1
+            ],
+            [
+              13,
+              21
+            ]
+          ]
+        }
+      },
+      "Model": "Random Forest"
+    },
+    {
+      "AUC-ROC": 0.9648177988518268,
+      "AUC-PR": 0.8779865017873584,
+      "F1-Mac": 0.7702154190683412,
+      "Sens.": 0.7285486844310375,
+      "Spec.": 0.9669753847447281,
+      "Balanced-Acc": 0.8477620345878827,
+      "Hamming-Loss": 0.07166666666666667,
+      "FitTime": 0.859,
+      "per_label": {
+        "Dyslexia": {
+          "Accuracy": 0.92,
+          "Precision": 0.7894736842105263,
+          "Recall": 0.5555555555555556,
+          "F1": 0.6521739130434783,
+          "ROC-AUC": 0.9631770498822522,
+          "PR-AUC": 0.8320021882689772,
+          "ConfusionMatrix": [
+            [
+              169,
+              4
+            ],
+            [
+              12,
+              15
+            ]
+          ]
+        },
+        "Dyscalculia": {
+          "Accuracy": 0.94,
+          "Precision": 0.9,
+          "Recall": 0.8653846153846154,
+          "F1": 0.8823529411764706,
+          "ROC-AUC": 0.963877338877339,
+          "PR-AUC": 0.9374222646145911,
+          "ConfusionMatrix": [
+            [
+              143,
+              5
+            ],
+            [
+              7,
+              45
+            ]
+          ]
+        },
+        "Dysgraphia": {
+          "Accuracy": 0.925,
+          "Precision": 0.7878787878787878,
+          "Recall": 0.7647058823529411,
+          "F1": 0.7761194029850746,
+          "ROC-AUC": 0.9673990077958894,
+          "PR-AUC": 0.8645350524785069,
+          "ConfusionMatrix": [
+            [
+              159,
+              7
+            ],
+            [
+              8,
+              26
+            ]
+          ]
+        }
+      },
+      "Model": "XGBoost"
+    },
+    {
+      "AUC-ROC": 0.9521265956183628,
+      "AUC-PR": 0.8648666784501439,
+      "F1-Mac": 0.812340568635117,
+      "Sens.": 0.8009329087760461,
+      "Spec.": 0.9627146298049564,
+      "Balanced-Acc": 0.8818237692905012,
+      "Hamming-Loss": 0.065,
+      "FitTime": 0.219,
+      "per_label": {
+        "Dyslexia": {
+          "Accuracy": 0.925,
+          "Precision": 0.7307692307692307,
+          "Recall": 0.7037037037037037,
+          "F1": 0.7169811320754716,
+          "ROC-AUC": 0.9214301006208521,
+          "PR-AUC": 0.7714798007235307,
+          "ConfusionMatrix": [
+            [
+              166,
+              7
+            ],
+            [
+              8,
+              19
+            ]
+          ]
+        },
+        "Dyscalculia": {
+          "Accuracy": 0.925,
+          "Precision": 0.8627450980392157,
+          "Recall": 0.8461538461538461,
+          "F1": 0.8543689320388349,
+          "ROC-AUC": 0.9601091476091476,
+          "PR-AUC": 0.9268993115959654,
+          "ConfusionMatrix": [
+            [
+              141,
+              7
+            ],
+            [
+              8,
+              44
+            ]
+          ]
+        },
+        "Dysgraphia": {
+          "Accuracy": 0.955,
+          "Precision": 0.8787878787878788,
+          "Recall": 0.8529411764705882,
+          "F1": 0.8656716417910447,
+          "ROC-AUC": 0.9748405386250886,
+          "PR-AUC": 0.8962209230309357,
+          "ConfusionMatrix": [
+            [
+              162,
+              4
+            ],
+            [
+              5,
+              29
+            ]
+          ]
+        }
+      },
+      "Model": "Simple MLP"
+    },
+    {
+      "AUC-ROC": 0.9660802904134099,
+      "AUC-PR": 0.8912192362509755,
+      "F1-Mac": 0.7817503310461057,
+      "Sens.": 0.9300597731970282,
+      "Spec.": 0.9010064629710844,
+      "Balanced-Acc": 0.9155331180840562,
+      "Hamming-Loss": 0.09333333333333334,
+      "FitTime": 0.013,
+      "per_label": {
+        "Dyslexia": {
+          "Accuracy": 0.895,
+          "Precision": 0.5681818181818182,
+          "Recall": 0.9259259259259259,
+          "F1": 0.704225352112676,
+          "ROC-AUC": 0.9608220937700707,
+          "PR-AUC": 0.8340197928520887,
+          "ConfusionMatrix": [
+            [
+              154,
+              19
+            ],
+            [
+              2,
+              25
+            ]
+          ]
+        },
+        "Dyscalculia": {
+          "Accuracy": 0.895,
+          "Precision": 0.7384615384615385,
+          "Recall": 0.9230769230769231,
+          "F1": 0.8205128205128205,
+          "ROC-AUC": 0.9684251559251558,
+          "PR-AUC": 0.9453863420505302,
+          "ConfusionMatrix": [
+            [
+              131,
+              17
+            ],
+            [
+              4,
+              48
+            ]
+          ]
+        },
+        "Dysgraphia": {
+          "Accuracy": 0.93,
+          "Precision": 0.7272727272727273,
+          "Recall": 0.9411764705882353,
+          "F1": 0.8205128205128205,
+          "ROC-AUC": 0.9689936215450035,
+          "PR-AUC": 0.8942515738503075,
+          "ConfusionMatrix": [
+            [
+              154,
+              12
+            ],
+            [
+              2,
+              32
+            ]
+          ]
+        }
+      },
+      "Model": "FT-Transformer\u2020 (Proposed)"
+    }
+  ],
+  "ft_transformer_per_disorder": {
+    "Dyslexia": {
+      "AUC": 0.9608220937700707,
+      "F1": 0.704225352112676,
+      "Sensitivity": 0.9259259259259259
+    },
+    "Dyscalculia": {
+      "AUC": 0.9684251559251558,
+      "F1": 0.8205128205128205,
+      "Sensitivity": 0.9230769230769231
+    },
+    "Dysgraphia": {
+      "AUC": 0.9689936215450035,
+      "F1": 0.8205128205128205,
+      "Sensitivity": 0.9411764705882353
+    }
+  }
+}

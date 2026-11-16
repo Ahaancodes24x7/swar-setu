@@ -1,0 +1,24 @@
+================================================================================
+MODEL COMPARISON TABLE (Synthetic Benchmark, n=1200, 800/200/200 Split)
+PIPELINE VALIDATION ON SYNTHETIC DATA — NOT REAL-WORLD PERFORMANCE
+================================================================================
+Model                        | AUC-ROC   | AUC-PR    | F1-Mac    | Sens.    | Spec.   
+-----------------------------+-----------+-----------+-----------+----------+----------
+Logistic Regression          | 0.9624    | 0.8709    | 0.7862    | 0.7992   | 0.9482  
+Random Forest                | 0.9669    | 0.8986    | 0.7466    | 0.6287   | 0.9896  
+XGBoost                      | 0.9648    | 0.8780    | 0.7702    | 0.7285   | 0.9670  
+Simple MLP                   | 0.9521    | 0.8649    | 0.8123    | 0.8009   | 0.9627  
+FT-Transformer† (Proposed)   | 0.9661    | 0.8912    | 0.7818    | 0.9301   | 0.9010  
+================================================================================
+MODEL COMPARISON TABLE (Synthetic Benchmark, n=1200, 800/200/200 Split)
+PIPELINE VALIDATION ON SYNTHETIC DATA — NOT REAL-WORLD PERFORMANCE
+================================================================================
+
+†Proposed method (Group Attention + Sigmoid LabelCorr + ASL + Dice Loss).
+Note: S=4 tokens = 4 cognitive domain groups (Dyslexia, Dyscalculia, Dysgraphia, Behavioural).
+CNN+BiLSTM pathways: architecture-validated; tabular fallback active during synthetic training.
+
+PER-DISORDER RESULTS (FT-Transformer, Synthetic):
+  Dyslexia: AUC=0.9608 F1=0.7042 Sens=0.9259 Spec=0.8902
+  Dyscalculia: AUC=0.9684 F1=0.8205 Sens=0.9231 Spec=0.8851
+  Dysgraphia: AUC=0.9690 F1=0.8205 Sens=0.9412 Spec=0.9277

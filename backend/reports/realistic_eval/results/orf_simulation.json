@@ -1,0 +1,131 @@
+{
+ "description": "WCPM recovered by alignReading() from simulated readers under an ASR error model (2000 readers per cell)",
+ "results": {
+  "grade_1": {
+   "wer_0": {
+    "n": 2000,
+    "prevalence_below_p25": 0.077,
+    "bias_wcpm": 0.248,
+    "mae_wcpm": 0.331,
+    "correlation": 0.999,
+    "naive_bias_wcpm": 5.078,
+    "flag_sensitivity": 0.993,
+    "flag_specificity": 0.999
+   },
+   "wer_0.05": {
+    "n": 2000,
+    "prevalence_below_p25": 0.078,
+    "bias_wcpm": -2.198,
+    "mae_wcpm": 2.309,
+    "correlation": 0.996,
+    "naive_bias_wcpm": 4.658,
+    "flag_sensitivity": 0.981,
+    "flag_specificity": 0.984
+   },
+   "wer_0.1": {
+    "n": 2000,
+    "prevalence_below_p25": 0.076,
+    "bias_wcpm": -4.56,
+    "mae_wcpm": 4.595,
+    "correlation": 0.992,
+    "naive_bias_wcpm": 4.399,
+    "flag_sensitivity": 0.987,
+    "flag_specificity": 0.954
+   },
+   "wer_0.2": {
+    "n": 2000,
+    "prevalence_below_p25": 0.076,
+    "bias_wcpm": -9.51,
+    "mae_wcpm": 9.514,
+    "correlation": 0.982,
+    "naive_bias_wcpm": 3.852,
+    "flag_sensitivity": 0.993,
+    "flag_specificity": 0.899
+   }
+  },
+  "grade_3": {
+   "wer_0": {
+    "n": 2000,
+    "prevalence_below_p25": 0.303,
+    "bias_wcpm": 1.694,
+    "mae_wcpm": 1.78,
+    "correlation": 0.999,
+    "naive_bias_wcpm": 9.99,
+    "flag_sensitivity": 0.959,
+    "flag_specificity": 1
+   },
+   "wer_0.05": {
+    "n": 2000,
+    "prevalence_below_p25": 0.306,
+    "bias_wcpm": -2.028,
+    "mae_wcpm": 3.176,
+    "correlation": 0.996,
+    "naive_bias_wcpm": 9.441,
+    "flag_sensitivity": 0.974,
+    "flag_specificity": 0.963
+   },
+   "wer_0.1": {
+    "n": 2000,
+    "prevalence_below_p25": 0.299,
+    "bias_wcpm": -6.202,
+    "mae_wcpm": 6.51,
+    "correlation": 0.995,
+    "naive_bias_wcpm": 8.611,
+    "flag_sensitivity": 0.998,
+    "flag_specificity": 0.915
+   },
+   "wer_0.2": {
+    "n": 2000,
+    "prevalence_below_p25": 0.292,
+    "bias_wcpm": -13.839,
+    "mae_wcpm": 13.878,
+    "correlation": 0.99,
+    "naive_bias_wcpm": 7.678,
+    "flag_sensitivity": 0.997,
+    "flag_specificity": 0.791
+   }
+  },
+  "grade_5": {
+   "wer_0": {
+    "n": 2000,
+    "prevalence_below_p25": 0.386,
+    "bias_wcpm": 2.404,
+    "mae_wcpm": 2.472,
+    "correlation": 0.999,
+    "naive_bias_wcpm": 13.337,
+    "flag_sensitivity": 0.96,
+    "flag_specificity": 1
+   },
+   "wer_0.05": {
+    "n": 2000,
+    "prevalence_below_p25": 0.384,
+    "bias_wcpm": -2.595,
+    "mae_wcpm": 4.063,
+    "correlation": 0.997,
+    "naive_bias_wcpm": 12.647,
+    "flag_sensitivity": 0.987,
+    "flag_specificity": 0.961
+   },
+   "wer_0.1": {
+    "n": 2000,
+    "prevalence_below_p25": 0.389,
+    "bias_wcpm": -7.584,
+    "mae_wcpm": 8.116,
+    "correlation": 0.995,
+    "naive_bias_wcpm": 12.231,
+    "flag_sensitivity": 0.996,
+    "flag_specificity": 0.894
+   },
+   "wer_0.2": {
+    "n": 2000,
+    "prevalence_below_p25": 0.386,
+    "bias_wcpm": -18.236,
+    "mae_wcpm": 18.293,
+    "correlation": 0.992,
+    "naive_bias_wcpm": 9.826,
+    "flag_sensitivity": 1,
+    "flag_specificity": 0.773
+   }
+  }
+ }
+}

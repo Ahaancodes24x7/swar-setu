@@ -1,0 +1,118 @@
+seed 0: Tests + questionnaire=0.877 | Tests only=0.873 | Questionnaire only=0.785 | LR + demographics (tests)=0.869 | Tests + questionnaire (no questionnaire at test)=0.866
+seed 1: Tests + questionnaire=0.866 | Tests only=0.864 | Questionnaire only=0.728 | LR + demographics (tests)=0.853 | Tests + questionnaire (no questionnaire at test)=0.860
+seed 2: Tests + questionnaire=0.868 | Tests only=0.865 | Questionnaire only=0.771 | LR + demographics (tests)=0.856 | Tests + questionnaire (no questionnaire at test)=0.860
+seed 3: Tests + questionnaire=0.844 | Tests only=0.843 | Questionnaire only=0.730 | LR + demographics (tests)=0.831 | Tests + questionnaire (no questionnaire at test)=0.841
+seed 4: Tests + questionnaire=0.839 | Tests only=0.842 | Questionnaire only=0.703 | LR + demographics (tests)=0.834 | Tests + questionnaire (no questionnaire at test)=0.836
+{
+ "models": {
+  "Tests + questionnaire": {
+   "auroc": 0.859,
+   "auprc": 0.426,
+   "ece": 0.017,
+   "sens": 0.86,
+   "spec": 0.684,
+   "ppv": 0.178,
+   "ext_auroc": 0.849,
+   "fpr_fluent": 0.302,
+   "fpr_learner": 0.36,
+   "fpr_acuity": 0.368
+  },
+  "Tests only": {
+   "auroc": 0.858,
+   "auprc": 0.428,
+   "ece": 0.016,
+   "sens": 0.866,
+   "spec": 0.68,
+   "ppv": 0.177,
+   "ext_auroc": 0.842,
+   "fpr_fluent": 0.309,
+   "fpr_learner": 0.356,
+   "fpr_acuity": 0.353
+  },
+  "Questionnaire only": {
+   "auroc": 0.743,
+   "auprc": 0.222,
+   "ece": 0.015,
+   "sens": 0.866,
+   "spec": 0.395,
+   "ppv": 0.102,
+   "ext_auroc": 0.738,
+   "fpr_fluent": 0.593,
+   "fpr_learner": 0.644,
+   "fpr_acuity": 0.641
+  },
+  "LR + demographics (tests)": {
+   "auroc": 0.849,
+   "auprc": 0.395,
+   "ece": 0.228,
+   "sens": 0.873,
+   "spec": 0.647,
+   "ppv": 0.164,
+   "ext_auroc": 0.835,
+   "fpr_fluent": 0.341,
+   "fpr_learner": 0.392,
+   "fpr_acuity": 0.399
+  },
+  "Tests + questionnaire (no questionnaire at test)": {
+   "auroc": 0.853,
+   "auprc": 0.417,
+   "ece": 0.019,
+   "sens": 0.86,
+   "spec": 0.664,
+   "ppv": 0.17,
+   "fpr_fluent": 0.323,
+   "fpr_learner": 0.377,
+   "fpr_acuity": 0.375
+  }
+ },
+ "bootstrap": {
+  "Tests only": {
+   "diff": [
+    0.0014045418127629408,
+    -0.0015915618957797106,
+    0.00446138739901461
+   ],
+   "p_le_0": 0.177
+  },
+  "Questionnaire only": {
+   "diff": [
+    0.11560654089091237,
+    0.10229363291323218,
+    0.12840532122545945
+   ],
+   "p_le_0": 0.0
+  },
+  "LR + demographics (tests)": {
+   "diff": [
+    0.010404364477984582,
+    0.005392966300727871,
+    0.015322163167336367
+   ],
+   "p_le_0": 0.0
+  }
+ },
+ "rule": {
+  "no_rule": {
+   "sens": 0.8602552461210513,
+   "spec": 0.6841847262478054,
+   "ppv": 0.1777572522965405,
+   "npv": 0.9843632789591172,
+   "f1": 0.2935280040737578,
+   "flag_rate": 0.3554444444444444,
+   "thr": 0.5,
+   "refer_rate": 0.3554444444444444
+  },
+  "exclusion_rule": {
+   "sens": 0.6806283092808846,
+   "spec": 0.760493500252022,
+   "ppv": 0.1870792276480861,
+   "npv": 0.967925722890578,
+   "f1": 0.28740234805217735,
+   "flag_rate": 0.2710555555555556,
+   "thr": 0.5,
+   "refer_rate": 0.2710555555555556
+  },
+  "share_of_true_positives_routed_to_exclusion_review": 0.21009783909614016,
+  "share_of_false_positives_routed_to_exclusion_review": 0.2453402588148402
+ }
+}

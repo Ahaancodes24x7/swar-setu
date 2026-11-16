@@ -1,0 +1,86 @@
+[boot] seed 0 models trained
+[boot] seed 1 models trained
+[boot] seed 2 models trained
+[boot] seed 3 models trained
+[boot] seed 4 models trained
+{
+ "LR + demographics": {
+  "diff": [
+   0.007261056249055736,
+   0.0023240429047898135,
+   0.012121354742943976
+  ],
+  "p_le_0": 0.001
+ },
+ "Logistic regression": {
+  "diff": [
+   0.0505551320933579,
+   0.04289661981431899,
+   0.058787279206107046
+  ],
+  "p_le_0": 0.0
+ },
+ "Random forest": {
+  "diff": [
+   0.048467556210242034,
+   0.04011235369880227,
+   0.05668812991495998
+  ],
+  "p_le_0": 0.0
+ },
+ "XGBoost": {
+  "diff": [
+   0.06203805476166215,
+   0.05343362086974378,
+   0.07076180932903448
+  ],
+  "p_le_0": 0.0
+ },
+ "FT-Transformer (ASL+Dice)": {
+  "diff": [
+   0.053466070719930495,
+   0.04473822701764238,
+   0.06256937788702066
+  ],
+  "p_le_0": 0.0
+ },
+ "FT-Transformer (BCE)": {
+  "diff": [
+   0.04819110060380336,
+   0.039577951656647486,
+   0.05681248068360066
+  ],
+  "p_le_0": 0.0
+ }
+}
+[sens] signal strength (loading scale)    0.70   best=LightGBM pipeline          Ligh=0.812 LR=0.811 Logi=0.740 Rand=0.738 XGBo=0.716 FT-T=0.733 FT-T=0.740
+[sens] signal strength (loading scale)    0.85   best=LightGBM pipeline          Ligh=0.835 LR=0.827 Logi=0.772 Rand=0.771 XGBo=0.751 FT-T=0.764 FT-T=0.772
+[sens] signal strength (loading scale)    1.00   best=LightGBM pipeline          Ligh=0.850 LR=0.839 Logi=0.796 Rand=0.797 XGBo=0.783 FT-T=0.792 FT-T=0.800
+[sens] signal strength (loading scale)    1.15   best=LightGBM pipeline          Ligh=0.861 LR=0.853 Logi=0.821 Rand=0.823 XGBo=0.817 FT-T=0.819 FT-T=0.825
+[sens] missed diagnoses (label FN rate)   0%     best=LightGBM pipeline          Ligh=0.860 LR=0.851 Logi=0.812 Rand=0.809 XGBo=0.801 FT-T=0.805 FT-T=0.816
+[sens] missed diagnoses (label FN rate)   10%    best=LightGBM pipeline          Ligh=0.850 LR=0.839 Logi=0.796 Rand=0.797 XGBo=0.783 FT-T=0.792 FT-T=0.800
+[sens] missed diagnoses (label FN rate)   20%    best=LightGBM pipeline          Ligh=0.836 LR=0.828 Logi=0.787 Rand=0.789 XGBo=0.775 FT-T=0.779 FT-T=0.782
+[sens] diagnostic reliability r           0.80   best=LightGBM pipeline          Ligh=0.815 LR=0.803 Logi=0.766 Rand=0.765 XGBo=0.742 FT-T=0.753 FT-T=0.774
+[sens] diagnostic reliability r           0.90   best=LightGBM pipeline          Ligh=0.850 LR=0.839 Logi=0.796 Rand=0.797 XGBo=0.783 FT-T=0.792 FT-T=0.800
+[sens] diagnostic reliability r           0.97   best=LightGBM pipeline          Ligh=0.857 LR=0.854 Logi=0.812 Rand=0.804 XGBo=0.803 FT-T=0.804 FT-T=0.811
+[sens] missing items                      0%     best=LightGBM pipeline          Ligh=0.856 LR=0.853 Logi=0.815 Rand=0.807 XGBo=0.792 FT-T=0.813 FT-T=0.818
+[sens] missing items                      8%     best=LightGBM pipeline          Ligh=0.850 LR=0.839 Logi=0.796 Rand=0.797 XGBo=0.783 FT-T=0.792 FT-T=0.800
+[sens] missing items                      20%    best=LightGBM pipeline          Ligh=0.840 LR=0.828 Logi=0.781 Rand=0.783 XGBo=0.772 FT-T=0.779 FT-T=0.786
+[sens] home-language shift (SD)           0      best=LightGBM pipeline          Ligh=0.848 LR=0.840 Logi=0.797 Rand=0.799 XGBo=0.786 FT-T=0.792 FT-T=0.799
+[sens] home-language shift (SD)           -0.35  best=LightGBM pipeline          Ligh=0.850 LR=0.839 Logi=0.796 Rand=0.797 XGBo=0.783 FT-T=0.792 FT-T=0.800
+[sens] home-language shift (SD)           -0.70  best=LightGBM pipeline          Ligh=0.850 LR=0.840 Logi=0.793 Rand=0.795 XGBo=0.782 FT-T=0.788 FT-T=0.800
+[sens] age slope (SD/year)                0      best=FT-Transformer (BCE)       Ligh=0.853 LR=0.845 Logi=0.846 Rand=0.852 XGBo=0.839 FT-T=0.841 FT-T=0.854
+[sens] age slope (SD/year)                0.25   best=LightGBM pipeline          Ligh=0.850 LR=0.839 Logi=0.796 Rand=0.797 XGBo=0.783 FT-T=0.792 FT-T=0.800
+[sens] age slope (SD/year)                0.50   best=LightGBM pipeline          Ligh=0.843 LR=0.832 Logi=0.769 Rand=0.775 XGBo=0.752 FT-T=0.768 FT-T=0.768
+[sens] prevalence                         x0.5   best=LightGBM pipeline          Ligh=0.810 LR=0.794 Logi=0.765 Rand=0.780 XGBo=0.743 FT-T=0.785 FT-T=0.794
+[sens] prevalence                         x1     best=LightGBM pipeline          Ligh=0.850 LR=0.839 Logi=0.796 Rand=0.797 XGBo=0.783 FT-T=0.792 FT-T=0.800
+[sens] prevalence                         x1.5   best=LightGBM pipeline          Ligh=0.857 LR=0.856 Logi=0.806 Rand=0.792 XGBo=0.792 FT-T=0.795 FT-T=0.802
+{
+ "configs": 22,
+ "lightgbm_best_or_within_0.005": 22,
+ "lightgbm_beats_ft_asl": 22,
+ "lightgbm_beats_ft_bce": 21,
+ "lr_demog_beats_lr": 21,
+ "min_kendall_tau_vs_baseline_ranking": 0.6190476190476191,
+ "mean_kendall_tau_vs_baseline_ranking": 0.8917748917748919
+}
